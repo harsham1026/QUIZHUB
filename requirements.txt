@@ -5,6 +5,7 @@ Flask-Migrate==4.1.0
 Flask-CORS==5.0.0
 PyMySQL==1.1.1
 pg8000==1.31.2
+scramp==1.4.6
 cryptography==44.0.1
 python-dotenv==1.0.1
 Werkzeug==3.1.3
