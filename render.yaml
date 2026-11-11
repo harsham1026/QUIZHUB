@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: pesquiz-backend
+    runtime: python
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn --worker-class eventlet -w 1 --bind 0.0.0.0:$PORT run:app
+    envVars:
+      - key: FLASK_ENV
+        value: production
+      - key: SECRET_KEY
+        generateValue: true
+      - key: JWT_SECRET_KEY
+        generateValue: true
+      - key: DATABASE_URL
+        value: sqlite:///quizhub.db
+      - key: CORS_ORIGINS
+        value: https://pesquiz.vercel.app
+      - key: DEBUG
+        value: "False"
+    plan: free
