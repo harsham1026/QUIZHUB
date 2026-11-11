@@ -3,14 +3,11 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
   Gamepad2,
-  Sparkles,
   Zap,
   CheckCircle,
   XCircle,
-  Flame,
   Award,
-  Clock,
-  ArrowRight
+  Send
 } from 'lucide-react';
 import { useGame } from '../contexts/GameContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -26,6 +23,7 @@ export const PlayGamePage = () => {
   const { user } = useAuth();
   const {
     pin,
+    participantId,
     joinGame,
     gameStatus,
     currentQuestion,
@@ -35,20 +33,26 @@ export const PlayGamePage = () => {
     selectedOptionIds,
     errorMessage,
     resetGame,
-    finalPodium,
     leaderboard,
   } = useGame();
 
   const [inputPin, setInputPin] = useState(initialPin);
   const [nickname, setNickname] = useState(user?.full_name || '');
   const [joined, setJoined] = useState(false);
+  const [multiSelection, setMultiSelection] = useState([]);
 
   useEffect(() => {
-    if (initialPin && initialPin.length === 6 && user) {
+    if (initialPin && initialPin.length === 6) {
       setInputPin(initialPin);
+    }
+    if (user?.full_name) {
       setNickname(user.full_name);
     }
   }, [initialPin, user]);
+
+  useEffect(() => {
+    setMultiSelection([]);
+  }, [currentQuestion?.id]);
 
   const handleJoin = async (e) => {
     e.preventDefault();
@@ -60,7 +64,7 @@ export const PlayGamePage = () => {
   };
 
   // 1. PIN & NICKNAME JOIN SCREEN
-  if (!joined && gameStatus === 'idle') {
+  if (!joined || gameStatus === 'idle') {
     return (
       <div className="min-h-[80vh] flex items-center justify-center px-4 py-12 relative z-10">
         <GlassCard className="w-full max-w-md p-8 border-neon-cyan/40 shadow-glow-cyan text-center">
@@ -163,14 +167,32 @@ export const PlayGamePage = () => {
       'bg-emerald-600 hover:bg-emerald-500 border-emerald-400/40 text-white shadow-lg',
     ];
     const symbols = ['▲', '◆', '●', '■'];
+    const isMulti = currentQuestion.question_type === 'multi_select';
+
+    const handleTileClick = (optId) => {
+      if (hasAnswered) return;
+      if (isMulti) {
+        setMultiSelection((prev) =>
+          prev.includes(optId) ? prev.filter((id) => id !== optId) : [...prev, optId]
+        );
+      } else {
+        submitAnswer([optId]);
+      }
+    };
 
     return (
       <div className="max-w-4xl mx-auto px-4 py-6 relative z-10 space-y-4">
-        {/* Top Question Info */}
         <div className="flex items-center justify-between px-2">
-          <span className="px-3 py-1 rounded-lg bg-surface border border-white/10 text-xs font-mono font-bold text-neon-cyan">
-            Q {currentQuestion.question_index + 1} / {currentQuestion.total_questions}
-          </span>
+          <div className="flex items-center gap-2">
+            <span className="px-3 py-1 rounded-lg bg-surface border border-white/10 text-xs font-mono font-bold text-neon-cyan">
+              Q {currentQuestion.question_index + 1} / {currentQuestion.total_questions}
+            </span>
+            {isMulti && (
+              <span className="px-2.5 py-1 rounded-lg bg-neon-purple/20 border border-neon-purple/40 text-[11px] font-mono font-bold text-neon-purple">
+                MULTI-SELECT
+              </span>
+            )}
+          </div>
           <TimerRing
             key={currentQuestion.id}
             duration={currentQuestion.remaining_seconds ?? currentQuestion.time_limit}
@@ -185,21 +207,23 @@ export const PlayGamePage = () => {
           </h2>
         </GlassCard>
 
-        {/* Answer option tiles */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
           {currentQuestion.options.map((opt, i) => {
-            const isSelected = selectedOptionIds.includes(opt.id);
+            const isSelected = hasAnswered
+              ? selectedOptionIds.includes(opt.id)
+              : multiSelection.includes(opt.id);
+
             return (
               <motion.button
                 key={opt.id}
                 whileHover={!hasAnswered ? { scale: 1.02 } : {}}
                 whileTap={!hasAnswered ? { scale: 0.98 } : {}}
                 disabled={hasAnswered}
-                onClick={() => submitAnswer([opt.id])}
+                onClick={() => handleTileClick(opt.id)}
                 className={`p-6 rounded-2xl border-2 flex items-center gap-4 transition-all duration-150 cursor-pointer text-left select-none ${
                   tileColors[i % 4]
                 } ${
-                  hasAnswered && isSelected
+                  isSelected
                     ? 'ring-4 ring-white border-white scale-102'
                     : hasAnswered && !isSelected
                     ? 'opacity-40 cursor-not-allowed'
@@ -215,6 +239,20 @@ export const PlayGamePage = () => {
           })}
         </div>
 
+        {isMulti && !hasAnswered && (
+          <div className="pt-4 flex justify-center">
+            <NeonButton
+              variant="cyan"
+              size="lg"
+              icon={Send}
+              disabled={multiSelection.length === 0}
+              onClick={() => submitAnswer(multiSelection)}
+            >
+              Submit Selected ({multiSelection.length})
+            </NeonButton>
+          </div>
+        )}
+
         {hasAnswered && (
           <div className="text-center pt-4">
             <span className="inline-flex items-center gap-2 px-4 py-2 rounded-full glass-panel border-neon-cyan/40 text-neon-cyan font-bold text-xs font-mono animate-pulse">
@@ -229,7 +267,12 @@ export const PlayGamePage = () => {
   // 4. ROUND RESULT SCREEN
   if (gameStatus === 'showing_result') {
     const correctIds = questionResult?.correct_option_ids || [];
-    const isPlayerCorrect = selectedOptionIds.some((id) => correctIds.includes(id));
+    const myServerResult = questionResult?.my_result;
+    const isPlayerCorrect = myServerResult
+      ? myServerResult.is_correct
+      : correctIds.length > 0 &&
+        selectedOptionIds.length === correctIds.length &&
+        selectedOptionIds.every((id) => correctIds.includes(id));
 
     return (
       <div className="min-h-[75vh] flex items-center justify-center px-4 py-12 relative z-10 text-center">
@@ -250,11 +293,17 @@ export const PlayGamePage = () => {
             <h2 className="text-3xl font-black font-heading text-white">
               {isPlayerCorrect ? 'CORRECT ANSWER!' : 'INCORRECT!'}
             </h2>
-            <p className="text-slate-400 text-xs mt-1">
-              {isPlayerCorrect
-                ? 'Blazing speed bonus applied to your score!'
-                : 'Keep your focus for the next round.'}
-            </p>
+            {myServerResult && isPlayerCorrect ? (
+              <p className="text-neon-cyan font-mono font-bold text-lg mt-2">
+                +{myServerResult.points_awarded} PTS ({myServerResult.response_time_seconds}s)
+              </p>
+            ) : (
+              <p className="text-slate-400 text-xs mt-1">
+                {isPlayerCorrect
+                  ? 'Blazing speed bonus applied to your score!'
+                  : 'Keep your focus for the next round.'}
+              </p>
+            )}
           </div>
 
           <div className="p-4 rounded-xl bg-surface border border-white/10 text-xs text-slate-400 font-mono">
@@ -267,14 +316,35 @@ export const PlayGamePage = () => {
 
   // 5. GAME COMPLETED
   if (gameStatus === 'completed') {
+    const myStanding = leaderboard.find(
+      (s) => s.id === participantId || s.nickname === nickname
+    );
+
     return (
       <div className="max-w-md mx-auto px-4 py-16 text-center relative z-10">
         <GlassCard className="p-8 border-neon-amber/40 shadow-glow-amber space-y-6">
           <Award className="w-16 h-16 text-neon-amber mx-auto animate-bounce" />
           <h2 className="text-3xl font-black font-heading text-white">BATTLE FINISHED!</h2>
           <p className="text-slate-300 text-sm">
-            Awesome match, <span className="text-neon-cyan font-bold">{nickname}</span>! Check the host's screen for the 3D podium ceremony.
+            Awesome match, <span className="text-neon-cyan font-bold">{nickname}</span>!
           </p>
+
+          {myStanding && (
+            <div className="p-4 rounded-xl bg-surface border border-white/10 grid grid-cols-2 gap-4 font-mono">
+              <div>
+                <span className="text-xs text-slate-400 block">FINAL RANK</span>
+                <span className="text-2xl font-black text-neon-amber">
+                  #{myStanding.final_rank || myStanding.rank}
+                </span>
+              </div>
+              <div>
+                <span className="text-xs text-slate-400 block">SCORE</span>
+                <span className="text-2xl font-black text-neon-cyan">
+                  {myStanding.final_score ?? myStanding.score} PTS
+                </span>
+              </div>
+            </div>
+          )}
 
           <NeonButton
             variant="cyan"
@@ -282,7 +352,7 @@ export const PlayGamePage = () => {
             className="w-full"
             onClick={() => {
               resetGame();
-              navigate('/student');
+              navigate(user?.role === 'teacher' ? '/teacher' : user?.role === 'admin' ? '/admin' : '/student');
             }}
           >
             Back to Dashboard
@@ -300,4 +370,3 @@ export const PlayGamePage = () => {
 };
 
 export default PlayGamePage;
-

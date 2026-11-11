@@ -38,7 +38,7 @@ def get_quizzes():
 @quizzes_bp.route("/my", methods=["GET"])
 @jwt_required()
 def get_my_quizzes():
-    user_id = get_jwt_identity()
+    user_id = int(get_jwt_identity())
     user = User.query.get(user_id)
     if not user:
         return jsonify({"error": "User not found"}), 404
@@ -50,7 +50,7 @@ def get_my_quizzes():
 @jwt_required()
 @role_required("teacher", "admin")
 def create_quiz():
-    user_id = get_jwt_identity()
+    user_id = int(get_jwt_identity())
     data = request.get_json() or {}
 
     title = data.get("title", "").strip()

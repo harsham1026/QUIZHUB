@@ -5,14 +5,11 @@ import {
   Users,
   Play,
   ArrowRight,
-  Trophy,
   CheckCircle,
-  Clock,
   Sparkles,
-  QrCode,
-  LogOut,
   Flame,
-  Volume2
+  Copy,
+  AlertCircle
 } from 'lucide-react';
 import { useGame } from '../contexts/GameContext';
 import GlassCard from '../components/common/GlassCard';
@@ -24,26 +21,48 @@ export const HostGamePage = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const pin = searchParams.get('pin');
+  const [copied, setCopied] = useState(false);
 
   const {
     initHost,
     startGame,
     nextQuestion,
-    endGame,
     participants,
     gameStatus,
     currentQuestion,
-    questionResult,
     leaderboard,
     finalPodium,
     answersCount,
+    errorMessage,
   } = useGame();
 
   useEffect(() => {
     if (pin) {
       initHost(pin);
     }
-  }, [pin]);
+  }, [pin, initHost]);
+
+  const handleCopyLink = () => {
+    const joinUrl = `${window.location.origin}/play?pin=${pin}`;
+    navigator.clipboard?.writeText(joinUrl);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2500);
+  };
+
+  if (errorMessage && gameStatus === 'lobby' && participants.length === 0) {
+    return (
+      <div className="max-w-lg mx-auto px-4 py-16 text-center relative z-10">
+        <GlassCard className="p-8 border-neon-pink/40 space-y-4">
+          <AlertCircle className="w-12 h-12 text-neon-pink mx-auto" />
+          <h2 className="text-2xl font-bold font-heading text-white">Session Unavailable</h2>
+          <p className="text-sm text-slate-400">{errorMessage}</p>
+          <NeonButton variant="outline" size="md" onClick={() => navigate('/teacher')}>
+            Return to Teacher Studio
+          </NeonButton>
+        </GlassCard>
+      </div>
+    );
+  }
 
   // LOBBY VIEW
   if (gameStatus === 'lobby') {
@@ -64,9 +83,19 @@ export const HostGamePage = () => {
             </span>
           </div>
 
-          <p className="text-slate-400 text-sm">
-            Players can also join by clicking "Enter PIN" in the top navbar.
-          </p>
+          <div className="flex flex-col items-center gap-3">
+            <p className="text-slate-400 text-sm">
+              Players can also join by clicking "Enter PIN" in the top navbar.
+            </p>
+            <button
+              type="button"
+              onClick={handleCopyLink}
+              className="inline-flex items-center gap-2 px-4 py-1.5 rounded-xl bg-surface border border-white/10 text-xs font-mono text-neon-cyan hover:border-neon-cyan/50 transition-colors"
+            >
+              <Copy className="w-3.5 h-3.5" />
+              {copied ? 'Join Link Copied!' : 'Copy Direct Join Link'}
+            </button>
+          </div>
 
           <div className="mt-8 flex justify-center">
             <NeonButton
@@ -189,6 +218,9 @@ export const HostGamePage = () => {
 
   // QUESTION RESULT & LEADERBOARD INTERMISSION
   if (gameStatus === 'showing_result') {
+    const isLastQuestion =
+      currentQuestion && currentQuestion.question_index + 1 >= currentQuestion.total_questions;
+
     return (
       <div className="max-w-4xl mx-auto px-4 py-8 relative z-10 space-y-6">
         <GlassCard className="p-8 border-neon-purple/30 shadow-glow-purple">
@@ -200,7 +232,7 @@ export const HostGamePage = () => {
               <h2 className="text-2xl font-bold font-heading text-white">LIVE SCOREBOARD</h2>
             </div>
             <NeonButton variant="cyan" size="md" icon={ArrowRight} onClick={nextQuestion}>
-              Next Question
+              {isLastQuestion ? 'Finish & Show Podium' : 'Next Question'}
             </NeonButton>
           </div>
 
@@ -262,4 +294,3 @@ export const HostGamePage = () => {
 };
 
 export default HostGamePage;
-

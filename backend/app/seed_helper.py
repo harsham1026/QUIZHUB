@@ -256,3 +256,4 @@ def seed_if_empty():
     ))
 
     db.session.commit()
+

@@ -99,7 +99,7 @@ def login():
 @auth_bp.route("/refresh", methods=["POST"])
 @jwt_required(refresh=True)
 def refresh():
-    user_id = get_jwt_identity()
+    user_id = int(get_jwt_identity())
     user = User.query.get(user_id)
     if not user or not user.is_active:
         return jsonify({"error": "Unauthorized", "message": "User not found or inactive"}), 401
@@ -110,7 +110,7 @@ def refresh():
 @auth_bp.route("/me", methods=["GET"])
 @jwt_required()
 def get_current_user_profile():
-    user_id = get_jwt_identity()
+    user_id = int(get_jwt_identity())
     user = User.query.get(user_id)
     if not user:
         return jsonify({"error": "Not Found", "message": "User not found"}), 404

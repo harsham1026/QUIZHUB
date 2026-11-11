@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import api from '../services/api';
 
 const AuthContext = createContext(null);
@@ -14,26 +14,31 @@ export const AuthProvider = ({ children }) => {
   });
   const [loading, setLoading] = useState(true);
 
+  const refreshUser = useCallback(async () => {
+    const token = localStorage.getItem('quizhub_access_token');
+    if (!token) return null;
+    try {
+      const res = await api.get('/auth/me');
+      setUser(res.data.user);
+      localStorage.setItem('quizhub_user', JSON.stringify(res.data.user));
+      return res.data.user;
+    } catch (err) {
+      console.warn('Failed to verify existing session:', err);
+      setUser(null);
+      localStorage.removeItem('quizhub_access_token');
+      localStorage.removeItem('quizhub_refresh_token');
+      localStorage.removeItem('quizhub_user');
+      return null;
+    }
+  }, []);
+
   useEffect(() => {
     const initAuth = async () => {
-      const token = localStorage.getItem('quizhub_access_token');
-      if (token) {
-        try {
-          const res = await api.get('/auth/me');
-          setUser(res.data.user);
-          localStorage.setItem('quizhub_user', JSON.stringify(res.data.user));
-        } catch (err) {
-          console.warn('Failed to verify existing session:', err);
-          setUser(null);
-          localStorage.removeItem('quizhub_access_token');
-          localStorage.removeItem('quizhub_refresh_token');
-          localStorage.removeItem('quizhub_user');
-        }
-      }
+      await refreshUser();
       setLoading(false);
     };
     initAuth();
-  }, []);
+  }, [refreshUser]);
 
   const login = async (email, password) => {
     const res = await api.post('/auth/login', { email, password });
@@ -78,6 +83,7 @@ export const AuthProvider = ({ children }) => {
         register,
         logout,
         updateUser,
+        refreshUser,
       }}
     >
       {children}
@@ -87,4 +93,3 @@ export const AuthProvider = ({ children }) => {
 
 export const useAuth = () => useContext(AuthContext);
 export default AuthContext;
-

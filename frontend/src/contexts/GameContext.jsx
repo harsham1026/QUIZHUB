@@ -106,8 +106,18 @@ export const GameProvider = ({ children }) => {
     }
   };
 
-  const initHost = async (gamePin) => {
+  const initHost = useCallback(async (gamePin) => {
     const cleanPin = gamePin.trim().toUpperCase();
+    lastQuestionIdRef.current = null;
+    advancingRef.current = false;
+    setParticipants([]);
+    setCurrentQuestion(null);
+    setQuestionResult(null);
+    setLeaderboard([]);
+    setFinalPodium([]);
+    setAnswersCount(0);
+    setSelectedOptionIds([]);
+    setHasAnswered(false);
     setPin(cleanPin);
     setIsHost(true);
     setParticipantId(null);
@@ -120,7 +130,7 @@ export const GameProvider = ({ children }) => {
       setErrorMessage(err.response?.data?.message || 'Unable to load host game session');
       setGameStatus('lobby');
     }
-  };
+  }, [applyServerState]);
 
   const startGame = async () => {
     if (!isHost || !pin) return;

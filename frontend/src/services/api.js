@@ -1,7 +1,9 @@
 import axios from 'axios';
 
+const BASE_URL = import.meta.env.VITE_API_URL || '/api';
+
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || '/api',
+  baseURL: BASE_URL,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -19,12 +21,12 @@ api.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config;
-    if (error.response?.status === 401 && !originalRequest._retry) {
+    if (error.response?.status === 401 && originalRequest && !originalRequest._retry) {
       originalRequest._retry = true;
       const refreshToken = localStorage.getItem('quizhub_refresh_token');
       if (refreshToken) {
         try {
-          const res = await axios.post('/api/auth/refresh', {}, {
+          const res = await axios.post(`${BASE_URL}/auth/refresh`, {}, {
             headers: { Authorization: `Bearer ${refreshToken}` },
           });
           const newToken = res.data.access_token;
@@ -44,4 +46,3 @@ api.interceptors.response.use(
 );
 
 export default api;
-

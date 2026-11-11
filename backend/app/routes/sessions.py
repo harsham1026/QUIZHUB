@@ -161,12 +161,26 @@ def _build_session_state(session: QuizSession, participant_id=None) -> dict:
 
         if session.status == "showing_result":
             correct_ids = [opt.id for opt in q.options if opt.is_correct]
+            my_result = None
+            if participant_id is not None:
+                my_sub = SubmittedAnswer.query.filter_by(
+                    session_id=session.id,
+                    participant_id=participant_id,
+                    question_id=q.id,
+                ).first()
+                if my_sub:
+                    my_result = {
+                        "is_correct": my_sub.is_correct,
+                        "points_awarded": my_sub.points_awarded,
+                        "response_time_seconds": round(my_sub.response_time_seconds, 2),
+                    }
             question_result = {
                 "question_index": q_idx,
                 "correct_option_ids": correct_ids,
                 "leaderboard": leaderboard,
                 "answers_count": answers_count,
                 "total_participants": len(participants_data),
+                "my_result": my_result,
             }
 
     final_podium = []

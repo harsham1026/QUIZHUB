@@ -4,9 +4,11 @@ from app.extensions import db
 from app.models.social import Challenge
 from app.models.quiz import Quiz
 from app.models.session import QuizSession
+from app.routes.sessions import _generate_unique_db_pin
 from app.services.game_manager import game_manager
 
 challenges_bp = Blueprint("challenges", __name__, url_prefix="/api/challenges")
+
 
 @challenges_bp.route("", methods=["GET"])
 @jwt_required()
@@ -16,6 +18,7 @@ def get_user_challenges():
         (Challenge.challenger_id == user_id) | (Challenge.challenged_id == user_id)
     ).order_by(Challenge.created_at.desc()).all()
     return jsonify({"challenges": [c.to_dict() for c in challenges]}), 200
+
 
 @challenges_bp.route("/create", methods=["POST"])
 @jwt_required()
@@ -29,8 +32,7 @@ def create_challenge():
     if not quiz:
         return jsonify({"error": "Quiz not found"}), 404
 
-    # Create 1v1 game session
-    pin = game_manager.generate_pin()
+    pin = _generate_unique_db_pin()
     session = QuizSession(
         pin=pin,
         quiz_id=quiz.id,
@@ -46,7 +48,7 @@ def create_challenge():
 
     challenge = Challenge(
         challenger_id=user_id,
-        challenged_id=challenged_id or user_id,  # Supports open duel if none specified
+        challenged_id=challenged_id or user_id,
         quiz_id=quiz.id,
         session_id=session.id,
         status="pending",
@@ -60,10 +62,10 @@ def create_challenge():
         "pin": pin,
     }), 201
 
+
 @challenges_bp.route("/<int:challenge_id>/accept", methods=["POST"])
 @jwt_required()
 def accept_challenge(challenge_id):
-    user_id = int(get_jwt_identity())
     challenge = Challenge.query.get(challenge_id)
     if not challenge:
         return jsonify({"error": "Challenge not found"}), 404
@@ -71,4 +73,3 @@ def accept_challenge(challenge_id):
     challenge.status = "accepted"
     db.session.commit()
     return jsonify({"message": "Challenge accepted", "challenge": challenge.to_dict()}), 200
-

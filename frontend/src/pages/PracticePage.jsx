@@ -1,15 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
 import {
   CheckCircle,
   XCircle,
   RotateCcw,
   ArrowRight,
   Award,
-  Zap,
   ArrowLeft,
-  Flame
+  Flame,
+  Send
 } from 'lucide-react';
 import api from '../services/api';
 import GlassCard from '../components/common/GlassCard';
@@ -22,9 +21,10 @@ export const PracticePage = () => {
   const [quiz, setQuiz] = useState(null);
   const [loading, setLoading] = useState(true);
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [selectedOption, setSelectedOption] = useState(null);
+  const [selectedIds, setSelectedIds] = useState([]);
   const [isAnswered, setIsAnswered] = useState(false);
   const [score, setScore] = useState(0);
+  const [correctCount, setCorrectCount] = useState(0);
   const [streak, setStreak] = useState(0);
   const [finished, setFinished] = useState(false);
 
@@ -58,24 +58,41 @@ export const PracticePage = () => {
   }
 
   const currentQ = quiz.questions[currentIndex];
+  const isMulti = currentQ.question_type === 'multi_select';
 
-  const handleSelectOption = (opt) => {
-    if (isAnswered) return;
-    setSelectedOption(opt);
+  const evaluateSelection = (chosenIds) => {
+    const correctIds = currentQ.options.filter((o) => o.is_correct).map((o) => o.id);
+    const isExactMatch =
+      chosenIds.length === correctIds.length &&
+      chosenIds.every((cid) => correctIds.includes(cid));
+
     setIsAnswered(true);
-
-    if (opt.is_correct) {
+    if (isExactMatch) {
       setScore((prev) => prev + currentQ.points);
+      setCorrectCount((prev) => prev + 1);
       setStreak((prev) => prev + 1);
     } else {
       setStreak(0);
     }
   };
 
+  const handleSelectOption = (opt) => {
+    if (isAnswered) return;
+    if (isMulti) {
+      setSelectedIds((prev) =>
+        prev.includes(opt.id) ? prev.filter((oid) => oid !== opt.id) : [...prev, opt.id]
+      );
+    } else {
+      const next = [opt.id];
+      setSelectedIds(next);
+      evaluateSelection(next);
+    }
+  };
+
   const handleNext = () => {
     if (currentIndex + 1 < quiz.questions.length) {
       setCurrentIndex((prev) => prev + 1);
-      setSelectedOption(null);
+      setSelectedIds([]);
       setIsAnswered(false);
     } else {
       setFinished(true);
@@ -84,14 +101,16 @@ export const PracticePage = () => {
 
   const handleRestart = () => {
     setCurrentIndex(0);
-    setSelectedOption(null);
+    setSelectedIds([]);
     setIsAnswered(false);
     setScore(0);
+    setCorrectCount(0);
     setStreak(0);
     setFinished(false);
   };
 
   if (finished) {
+    const accuracy = Math.round((correctCount / quiz.questions.length) * 100);
     return (
       <div className="max-w-md mx-auto px-4 py-16 text-center relative z-10">
         <GlassCard className="p-8 border-neon-cyan/40 shadow-glow-cyan space-y-6">
@@ -100,13 +119,16 @@ export const PracticePage = () => {
           <div className="p-4 rounded-xl bg-surface border border-white/10 space-y-2">
             <p className="text-sm text-slate-400 font-mono">Final Practice Score</p>
             <p className="text-4xl font-black font-mono text-neon-cyan">{score} PTS</p>
+            <p className="text-xs font-mono text-slate-400">
+              {correctCount} / {quiz.questions.length} Correct ({accuracy}% Accuracy)
+            </p>
           </div>
           <div className="flex gap-3">
             <NeonButton variant="outline" size="md" icon={RotateCcw} onClick={handleRestart} className="flex-1">
               Retry
             </NeonButton>
-            <NeonButton variant="cyan" size="md" onClick={() => navigate('/student')} className="flex-1">
-              Dashboard
+            <NeonButton variant="cyan" size="md" onClick={() => navigate('/explore')} className="flex-1">
+              More Quizzes
             </NeonButton>
           </div>
         </GlassCard>
@@ -127,6 +149,11 @@ export const PracticePage = () => {
           <span className="px-3 py-1 rounded-lg bg-surface border border-white/10 text-xs font-mono font-bold text-neon-cyan">
             Question {currentIndex + 1} / {quiz.questions.length}
           </span>
+          {isMulti && (
+            <span className="px-2.5 py-1 rounded-lg bg-neon-purple/20 border border-neon-purple/40 text-[11px] font-mono font-bold text-neon-purple">
+              MULTI-SELECT
+            </span>
+          )}
           {streak > 1 && (
             <span className="flex items-center gap-1 text-xs text-neon-pink font-bold font-mono">
               <Flame className="w-4 h-4 fill-current" /> {streak} Streak
@@ -142,8 +169,10 @@ export const PracticePage = () => {
 
         <div className="grid grid-cols-1 gap-3 mt-6">
           {currentQ.options.map((opt, i) => {
-            const isSelected = selectedOption?.id === opt.id;
-            let btnStyle = 'bg-surface hover:bg-surfaceLight border-white/10 text-white';
+            const isSelected = selectedIds.includes(opt.id);
+            let btnStyle = isSelected
+              ? 'bg-neon-blue/20 border-neon-blue text-white'
+              : 'bg-surface hover:bg-surfaceLight border-white/10 text-white';
 
             if (isAnswered) {
               if (opt.is_correct) {
@@ -170,17 +199,27 @@ export const PracticePage = () => {
           })}
         </div>
 
-        {isAnswered && (
-          <div className="mt-6 flex justify-end">
+        <div className="mt-6 flex justify-end gap-3">
+          {isMulti && !isAnswered && (
+            <NeonButton
+              variant="primary"
+              size="md"
+              icon={Send}
+              disabled={selectedIds.length === 0}
+              onClick={() => evaluateSelection(selectedIds)}
+            >
+              Check Answer
+            </NeonButton>
+          )}
+          {isAnswered && (
             <NeonButton variant="cyan" size="md" icon={ArrowRight} onClick={handleNext}>
               {currentIndex + 1 < quiz.questions.length ? 'Next Question' : 'View Results'}
             </NeonButton>
-          </div>
-        )}
+          )}
+        </div>
       </GlassCard>
     </div>
   );
 };
 
 export default PracticePage;
-

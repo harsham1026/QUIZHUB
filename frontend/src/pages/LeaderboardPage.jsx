@@ -60,6 +60,14 @@ export const LeaderboardPage = () => {
 
       {loading ? (
         <div className="text-center py-20 text-slate-500">Calculating rankings...</div>
+      ) : leaders.length === 0 ? (
+        <GlassCard className="text-center py-16">
+          <Trophy className="w-12 h-12 text-slate-600 mx-auto mb-3" />
+          <h3 className="text-lg font-bold text-white">No Rankings Recorded Yet</h3>
+          <p className="text-slate-400 text-sm mt-1">
+            No multiplayer matches have been completed in this time period yet.
+          </p>
+        </GlassCard>
       ) : (
         <GlassCard className="p-0 overflow-hidden border-white/10">
           <div className="overflow-x-auto">

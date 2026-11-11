@@ -55,10 +55,17 @@ export const QuizCreatorPage = () => {
   const [aiCount, setAiCount] = useState(5);
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState('');
+  const [aiConfigured, setAiConfigured] = useState(true);
 
   const [saving, setSaving] = useState(false);
   const [statusMessage, setStatusMessage] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
+
+  useEffect(() => {
+    api.get('/ai/status')
+      .then((res) => setAiConfigured(Boolean(res.data?.configured)))
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     if (editId) {
@@ -107,24 +114,24 @@ export const QuizCreatorPage = () => {
   };
 
   const handleQuestionTextChange = (qIndex, text) => {
-    const updated = [...questions];
-    updated[qIndex].question_text = text;
-    setQuestions(updated);
+    setQuestions((prev) =>
+      prev.map((q, idx) => (idx === qIndex ? { ...q, question_text: text } : q))
+    );
   };
 
   const handleOptionChange = (qIndex, optIndex, field, value) => {
-    const updated = [...questions];
-    const q = updated[qIndex];
-
-    if (field === 'is_correct' && q.question_type !== 'multi_select') {
-      // Single select: uncheck others
-      q.options.forEach((opt, idx) => {
-        opt.is_correct = idx === optIndex;
-      });
-    } else {
-      q.options[optIndex][field] = value;
-    }
-    setQuestions(updated);
+    setQuestions((prev) =>
+      prev.map((q, idx) => {
+        if (idx !== qIndex) return q;
+        const newOptions = q.options.map((opt, oIdx) => {
+          if (field === 'is_correct' && q.question_type !== 'multi_select') {
+            return { ...opt, is_correct: oIdx === optIndex };
+          }
+          return oIdx === optIndex ? { ...opt, [field]: value } : opt;
+        });
+        return { ...q, options: newOptions };
+      })
+    );
   };
 
   const handleTypeChange = (qIndex, newType) => {
@@ -470,6 +477,13 @@ export const QuizCreatorPage = () => {
             <p className="text-slate-400 text-xs mt-1 mb-6">
               Enter any topic and Gemini AI will synthesize complete competitive questions with correct answers.
             </p>
+
+            {!aiConfigured && !aiError && (
+              <div className="mb-4 p-3 rounded-xl bg-neon-amber/10 border border-neon-amber/30 text-neon-amber text-xs flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                <span>GEMINI_API_KEY is not set in Vercel Environment Variables yet.</span>
+              </div>
+            )}
 
             {aiError && (
               <div className="mb-4 p-3 rounded-xl bg-neon-pink/10 border border-neon-pink/30 text-neon-pink text-xs flex items-center gap-2">
