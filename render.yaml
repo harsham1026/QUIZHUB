@@ -19,3 +19,4 @@ services:
       - key: DEBUG
         value: "False"
     plan: free
+
