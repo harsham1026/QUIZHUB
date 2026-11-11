@@ -50,11 +50,13 @@ export const PlayGamePage = () => {
     }
   }, [initialPin, user]);
 
-  const handleJoin = (e) => {
+  const handleJoin = async (e) => {
     e.preventDefault();
     if (!inputPin.trim() || !nickname.trim()) return;
-    joinGame(inputPin.trim().toUpperCase(), nickname.trim());
-    setJoined(true);
+    const ok = await joinGame(inputPin.trim().toUpperCase(), nickname.trim());
+    if (ok) {
+      setJoined(true);
+    }
   };
 
   // 1. PIN & NICKNAME JOIN SCREEN
@@ -169,7 +171,12 @@ export const PlayGamePage = () => {
           <span className="px-3 py-1 rounded-lg bg-surface border border-white/10 text-xs font-mono font-bold text-neon-cyan">
             Q {currentQuestion.question_index + 1} / {currentQuestion.total_questions}
           </span>
-          <TimerRing duration={currentQuestion.time_limit} size={64} strokeWidth={5} />
+          <TimerRing
+            key={currentQuestion.id}
+            duration={currentQuestion.remaining_seconds ?? currentQuestion.time_limit}
+            size={64}
+            strokeWidth={5}
+          />
         </div>
 
         <GlassCard className="p-6 text-center border-neon-blue/30 shadow-glow-blue">

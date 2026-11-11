@@ -1,7 +1,8 @@
 import os
 from flask import Flask, jsonify
 from app.config import config_by_name
-from app.extensions import db, jwt, socketio, cors, migrate
+from app.extensions import db, jwt, socketio, cors, migrate, HAS_SOCKETIO
+
 
 def create_app(config_name=None):
     if not config_name:
@@ -14,7 +15,8 @@ def create_app(config_name=None):
     db.init_app(flask_app)
     jwt.init_app(flask_app)
     cors.init_app(flask_app, resources={r"/api/*": {"origins": "*"}})
-    socketio.init_app(flask_app)
+    if HAS_SOCKETIO:
+        socketio.init_app(flask_app)
     migrate.init_app(flask_app, db)
 
     # Register Blueprints
@@ -38,21 +40,24 @@ def create_app(config_name=None):
     flask_app.register_blueprint(admin_bp)
     flask_app.register_blueprint(users_bp)
 
-    # Import socket events to bind handlers
     with flask_app.app_context():
-        import app.sockets.game_events
-        # Create database tables if not existing
+        if HAS_SOCKETIO and not (os.getenv("VERCEL") or os.getenv("VERCEL_ENV")):
+            import app.sockets.game_events  # noqa: F401
         try:
             db.create_all()
+            from app.seed_helper import seed_if_empty
+            seed_if_empty()
         except Exception as e:
-            flask_app.logger.warning(f"db.create_all() encountered note: {e}")
+            db.session.rollback()
+            flask_app.logger.warning(f"DB init/seed note: {e}")
 
     @flask_app.route("/api/health", methods=["GET"])
     def health_check():
         return jsonify({
             "status": "healthy",
             "service": "QuizHub API",
-            "version": "1.0.0"
+            "version": "1.0.0",
+            "mode": "serverless" if (os.getenv("VERCEL") or os.getenv("VERCEL_ENV")) else "standard",
         }), 200
 
     return flask_app

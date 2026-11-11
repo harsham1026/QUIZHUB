@@ -1,5 +1,5 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import socketService from '../services/socket';
+import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
+import api from '../services/api';
 import { useAuth } from './AuthContext';
 
 const GameContext = createContext(null);
@@ -9,7 +9,7 @@ export const GameProvider = ({ children }) => {
   const [pin, setPin] = useState('');
   const [participantId, setParticipantId] = useState(null);
   const [isHost, setIsHost] = useState(false);
-  const [gameStatus, setGameStatus] = useState('idle'); // idle, lobby, active, question_active, showing_result, completed
+  const [gameStatus, setGameStatus] = useState('idle'); // idle, lobby, question_active, showing_result, completed
   const [participants, setParticipants] = useState([]);
   const [currentQuestion, setCurrentQuestion] = useState(null);
   const [questionResult, setQuestionResult] = useState(null);
@@ -20,119 +20,163 @@ export const GameProvider = ({ children }) => {
   const [hasAnswered, setHasAnswered] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
-  const socket = socketService.getSocket();
+  const lastQuestionIdRef = useRef(null);
+  const advancingRef = useRef(false);
 
-  useEffect(() => {
-    socket.on('player_joined', (data) => {
-      // New player joined
-    });
+  const applyServerState = useCallback((state) => {
+    if (!state) return;
 
-    socket.on('lobby_updated', (data) => {
-      setParticipants(data.participants || []);
-    });
+    setParticipants(state.participants || []);
+    setAnswersCount(state.answers_count || 0);
+    setLeaderboard(state.leaderboard || []);
 
-    socket.on('join_success', (data) => {
-      setParticipantId(data.participant_id);
-      setGameStatus(data.status || 'lobby');
-      setErrorMessage('');
-    });
-
-    socket.on('game_started', () => {
-      setGameStatus('question_active');
-    });
-
-    socket.on('new_question', (data) => {
-      setCurrentQuestion(data);
+    const incomingQ = state.current_question || null;
+    if (incomingQ && incomingQ.id !== lastQuestionIdRef.current) {
+      lastQuestionIdRef.current = incomingQ.id;
+      setSelectedOptionIds(state.selected_option_ids || []);
+      setHasAnswered(Boolean(state.has_answered));
       setQuestionResult(null);
-      setSelectedOptionIds([]);
-      setHasAnswered(false);
-      setGameStatus('question_active');
-    });
+    } else if (state.has_answered) {
+      setHasAnswered(true);
+      if (state.selected_option_ids?.length) {
+        setSelectedOptionIds(state.selected_option_ids);
+      }
+    }
 
-    socket.on('answer_received', (data) => {
-      setAnswersCount(data.answers_count || 0);
-    });
+    setCurrentQuestion(incomingQ);
+    setQuestionResult(state.question_result || null);
 
-    socket.on('question_ended', (data) => {
-      setQuestionResult(data);
-      setLeaderboard(data.leaderboard || []);
-      setGameStatus('showing_result');
-    });
+    if (state.status === 'completed') {
+      setFinalPodium(state.final_podium || []);
+      if (state.full_standings?.length) {
+        setLeaderboard(state.full_standings);
+      }
+    }
 
-    socket.on('game_finished', (data) => {
-      setFinalPodium(data.podium || []);
-      setLeaderboard(data.full_standings || []);
-      setGameStatus('completed');
-    });
+    setGameStatus(state.status || 'lobby');
+    setErrorMessage('');
+  }, []);
 
-    socket.on('error_message', (data) => {
-      setErrorMessage(data.message || 'An error occurred');
-    });
+  // Poll live game state every 1s while a session is active
+  useEffect(() => {
+    if (!pin || gameStatus === 'idle' || gameStatus === 'completed') {
+      return;
+    }
 
-    return () => {
-      socket.off('player_joined');
-      socket.off('lobby_updated');
-      socket.off('join_success');
-      socket.off('game_started');
-      socket.off('new_question');
-      socket.off('answer_received');
-      socket.off('question_ended');
-      socket.off('game_finished');
-      socket.off('error_message');
+    let cancelled = false;
+    const fetchState = async () => {
+      try {
+        const params = participantId ? { participant_id: participantId } : {};
+        const res = await api.get(`/sessions/${pin}/state`, { params });
+        if (!cancelled) {
+          applyServerState(res.data);
+        }
+      } catch (err) {
+        if (!cancelled && err.response?.status === 404) {
+          setErrorMessage(err.response?.data?.message || 'Game session not found');
+        }
+      }
     };
-  }, [socket]);
 
-  const joinGame = (gamePin, nickname) => {
-    setPin(gamePin);
-    setIsHost(false);
-    setGameStatus('lobby');
-    socket.emit('join_game', {
-      pin: gamePin,
-      nickname,
-      user_id: user?.id || null,
-    });
-  };
+    const interval = setInterval(fetchState, 1000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [pin, participantId, gameStatus, applyServerState]);
 
-  const initHost = (gamePin) => {
-    setPin(gamePin);
-    setIsHost(true);
-    setGameStatus('lobby');
-    socket.emit('host_connect', {
-      pin: gamePin,
-      host_id: user?.id,
-    });
-  };
-
-  const startGame = () => {
-    if (isHost && pin) {
-      socket.emit('start_game', { pin });
+  const joinGame = async (gamePin, nickname) => {
+    const cleanPin = gamePin.trim().toUpperCase();
+    setErrorMessage('');
+    try {
+      const res = await api.post(`/sessions/${cleanPin}/join`, {
+        nickname,
+        user_id: user?.id || null,
+      });
+      setPin(cleanPin);
+      setIsHost(false);
+      setParticipantId(res.data.participant_id);
+      lastQuestionIdRef.current = res.data.current_question?.id || null;
+      applyServerState(res.data);
+      return true;
+    } catch (err) {
+      setErrorMessage(err.response?.data?.message || 'Invalid or expired Game PIN');
+      setGameStatus('idle');
+      return false;
     }
   };
 
-  const submitAnswer = (optionIds) => {
-    if (hasAnswered || !currentQuestion) return;
+  const initHost = async (gamePin) => {
+    const cleanPin = gamePin.trim().toUpperCase();
+    setPin(cleanPin);
+    setIsHost(true);
+    setParticipantId(null);
+    setErrorMessage('');
+    try {
+      const res = await api.get(`/sessions/${cleanPin}/state`);
+      lastQuestionIdRef.current = res.data.current_question?.id || null;
+      applyServerState(res.data);
+    } catch (err) {
+      setErrorMessage(err.response?.data?.message || 'Unable to load host game session');
+      setGameStatus('lobby');
+    }
+  };
+
+  const startGame = async () => {
+    if (!isHost || !pin) return;
+    try {
+      const res = await api.post(`/sessions/${pin}/start`);
+      applyServerState(res.data);
+    } catch (err) {
+      setErrorMessage(err.response?.data?.message || 'Failed to start game');
+    }
+  };
+
+  const submitAnswer = async (optionIds) => {
+    if (hasAnswered || !currentQuestion || !participantId || !pin) return;
     setSelectedOptionIds(optionIds);
     setHasAnswered(true);
-    socket.emit('submit_answer', {
-      pin,
-      participant_id: participantId,
-      selected_option_ids: optionIds,
-    });
-  };
-
-  const nextQuestion = () => {
-    if (isHost && pin) {
-      socket.emit('next_question', { pin });
+    try {
+      const res = await api.post(`/sessions/${pin}/answer`, {
+        participant_id: participantId,
+        selected_option_ids: optionIds,
+      });
+      applyServerState(res.data);
+    } catch (err) {
+      if (err.response?.status !== 409) {
+        setErrorMessage(err.response?.data?.message || 'Failed to submit answer');
+      }
     }
   };
 
-  const endGame = () => {
-    if (isHost && pin) {
-      socket.emit('end_game', { pin });
+  const nextQuestion = async () => {
+    if (!isHost || !pin || advancingRef.current) return;
+    advancingRef.current = true;
+    try {
+      const res = await api.post(`/sessions/${pin}/next`);
+      applyServerState(res.data);
+    } catch (err) {
+      setErrorMessage(err.response?.data?.message || 'Failed to advance question');
+    } finally {
+      setTimeout(() => {
+        advancingRef.current = false;
+      }, 400);
+    }
+  };
+
+  const endGame = async () => {
+    if (!isHost || !pin) return;
+    try {
+      const res = await api.post(`/sessions/${pin}/end`);
+      applyServerState(res.data);
+    } catch (err) {
+      setErrorMessage(err.response?.data?.message || 'Failed to end game');
     }
   };
 
   const resetGame = () => {
+    lastQuestionIdRef.current = null;
+    advancingRef.current = false;
     setPin('');
     setParticipantId(null);
     setIsHost(false);
@@ -180,4 +224,3 @@ export const GameProvider = ({ children }) => {
 
 export const useGame = () => useContext(GameContext);
 export default GameContext;
-

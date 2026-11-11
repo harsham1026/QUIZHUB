@@ -143,7 +143,8 @@ export const HostGamePage = () => {
                 </span>
               </div>
               <TimerRing
-                duration={currentQuestion.time_limit}
+                key={currentQuestion.id}
+                duration={currentQuestion.remaining_seconds ?? currentQuestion.time_limit}
                 onExpire={nextQuestion}
                 size={70}
                 strokeWidth={5}
