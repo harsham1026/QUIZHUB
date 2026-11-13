@@ -11,6 +11,7 @@ class User(db.Model):
     full_name = db.Column(db.String(120), nullable=False)
     role = db.Column(db.String(50), nullable=False, default="user")
     google_id = db.Column(db.String(191), unique=True, nullable=True, index=True)
+    auth_provider = db.Column(db.String(50), nullable=False, default="email")
     avatar_url = db.Column(db.String(500), nullable=True)
     is_active = db.Column(db.Boolean, default=True, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
@@ -26,6 +27,10 @@ class User(db.Model):
 
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
+        if self.google_id:
+            self.auth_provider = "both"
+        else:
+            self.auth_provider = "email"
 
     def check_password(self, password):
         if not self.password_hash:
@@ -33,13 +38,16 @@ class User(db.Model):
         return check_password_hash(self.password_hash, password)
 
     def to_dict(self, include_profile=True):
+        pic = self.avatar_url or f"https://api.dicebear.com/7.x/bottts/svg?seed={self.email}"
         data = {
             "id": self.id,
             "google_id": self.google_id,
             "email": self.email,
             "full_name": self.full_name,
             "role": self.role or "user",
-            "avatar_url": self.avatar_url or f"https://api.dicebear.com/7.x/bottts/svg?seed={self.email}",
+            "avatar_url": pic,
+            "profile_picture": pic,
+            "auth_provider": self.auth_provider or ("google" if self.google_id and not self.password_hash else "both" if self.google_id and self.password_hash else "email"),
             "is_active": self.is_active,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "last_login": self.last_login.isoformat() if self.last_login else None,

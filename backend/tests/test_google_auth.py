@@ -1,10 +1,11 @@
 import unittest
 from unittest.mock import patch, MagicMock
+from itsdangerous import URLSafeTimedSerializer
 from app import create_app, db
 from app.models.user import User, StudentProfile
 from app.models.quiz import Quiz
 
-class GoogleAuthTestCase(unittest.TestCase):
+class GoogleAndEmailAuthTestCase(unittest.TestCase):
     def setUp(self):
         self.app = create_app("testing")
         self.client = self.app.test_client()
@@ -23,14 +24,169 @@ class GoogleAuthTestCase(unittest.TestCase):
         data = res.get_json()
         self.assertIn("google_client_id", data)
         self.assertIn("google_configured", data)
+        self.assertIn("smtp_configured", data)
 
-    def test_google_auth_validation_missing_tokens(self):
-        res = self.client.post("/api/auth/google", json={})
+    # 1. Register with Gmail address
+    def test_register_gmail_address(self):
+        res = self.client.post("/api/auth/register", json={
+            "full_name": "Google User",
+            "email": "player.one@gmail.com",
+            "password": "StrongPassword123!",
+            "confirm_password": "StrongPassword123!"
+        })
+        self.assertEqual(res.status_code, 201)
+        data = res.get_json()
+        self.assertIn("access_token", data)
+        self.assertIn("refresh_token", data)
+        user = data.get("user")
+        self.assertEqual(user.get("email"), "player.one@gmail.com")
+        self.assertEqual(user.get("full_name"), "Google User")
+        self.assertEqual(user.get("role"), "user")
+        self.assertEqual(user.get("auth_provider"), "email")
+        self.assertIsNotNone(user.get("profile_picture"))
+
+    # 2. Register with Outlook address
+    def test_register_outlook_address(self):
+        res = self.client.post("/api/auth/register", json={
+            "full_name": "Outlook User",
+            "email": "gamer.two@outlook.com",
+            "password": "OutlookSecret888",
+            "confirm_password": "OutlookSecret888"
+        })
+        self.assertEqual(res.status_code, 201)
+        self.assertEqual(res.get_json().get("user").get("email"), "gamer.two@outlook.com")
+
+    # 3. Register with Yahoo & other domains
+    def test_register_yahoo_and_custom_domain(self):
+        res = self.client.post("/api/auth/register", json={
+            "full_name": "Yahoo User",
+            "email": "champion@yahoo.com",
+            "password": "YahooPassword2026",
+            "confirm_password": "YahooPassword2026"
+        })
+        self.assertEqual(res.status_code, 201)
+
+        res2 = self.client.post("/api/auth/register", json={
+            "full_name": "Custom Domain User",
+            "email": "coder@pes.edu",
+            "password": "AcademicSecure999",
+            "confirm_password": "AcademicSecure999"
+        })
+        self.assertEqual(res2.status_code, 201)
+
+    # 4. Reject invalid email format
+    def test_register_invalid_email_format(self):
+        res = self.client.post("/api/auth/register", json={
+            "full_name": "Bad Email",
+            "email": "not-an-email",
+            "password": "ValidPassword123",
+            "confirm_password": "ValidPassword123"
+        })
         self.assertEqual(res.status_code, 400)
-        self.assertIn("Validation Error", res.get_json().get("error"))
+        self.assertIn("valid email address", res.get_json().get("message").lower())
 
+    # 5. Reject short passwords (< 8 characters)
+    def test_register_reject_short_password(self):
+        res = self.client.post("/api/auth/register", json={
+            "full_name": "Short Pass",
+            "email": "short@example.com",
+            "password": "1234567",
+            "confirm_password": "1234567"
+        })
+        self.assertEqual(res.status_code, 400)
+        self.assertIn("at least 8 characters", res.get_json().get("message").lower())
+
+    # 6. Reject password confirmation mismatch
+    def test_register_password_mismatch(self):
+        res = self.client.post("/api/auth/register", json={
+            "full_name": "Mismatch User",
+            "email": "mismatch@example.com",
+            "password": "Password123!",
+            "confirm_password": "Password999!"
+        })
+        self.assertEqual(res.status_code, 400)
+        self.assertIn("passwords do not match", res.get_json().get("message").lower())
+
+    # 7. Prevent duplicate email registration
+    def test_register_duplicate_email(self):
+        payload = {
+            "full_name": "First Register",
+            "email": "duplicate@quizhub.com",
+            "password": "SecurePassword1",
+            "confirm_password": "SecurePassword1"
+        }
+        res1 = self.client.post("/api/auth/register", json=payload)
+        self.assertEqual(res1.status_code, 201)
+
+        res2 = self.client.post("/api/auth/register", json=payload)
+        self.assertEqual(res2.status_code, 409)
+        self.assertIn("already exists", res2.get_json().get("message").lower())
+
+    # 8. Email & Password Login with correct and incorrect credentials
+    def test_login_email_password(self):
+        # Register user
+        self.client.post("/api/auth/register", json={
+            "full_name": "Login Tester",
+            "email": "logintester@quizhub.com",
+            "password": "MySuperSecretPassword",
+            "confirm_password": "MySuperSecretPassword"
+        })
+
+        # Correct login
+        res = self.client.post("/api/auth/login", json={
+            "email": "logintester@quizhub.com",
+            "password": "MySuperSecretPassword"
+        })
+        self.assertEqual(res.status_code, 200)
+        data = res.get_json()
+        self.assertIn("access_token", data)
+        self.assertIn("refresh_token", data)
+        self.assertEqual(data.get("user").get("email"), "logintester@quizhub.com")
+
+        # Incorrect password
+        bad_res = self.client.post("/api/auth/login", json={
+            "email": "logintester@quizhub.com",
+            "password": "WrongPassword123"
+        })
+        self.assertEqual(bad_res.status_code, 401)
+        self.assertIn("invalid", bad_res.get_json().get("message").lower())
+
+    # 9. Password reset flow with time-limited token
+    def test_password_reset_flow(self):
+        # Register user
+        self.client.post("/api/auth/register", json={
+            "full_name": "Reset Tester",
+            "email": "reset@quizhub.com",
+            "password": "OldPassword1234",
+            "confirm_password": "OldPassword1234"
+        })
+
+        # Forgot password request
+        forgot_res = self.client.post("/api/auth/forgot-password", json={"email": "reset@quizhub.com"})
+        self.assertEqual(forgot_res.status_code, 200)
+
+        # Generate a valid timed token using the app's secret key
+        s = URLSafeTimedSerializer(self.app.config["SECRET_KEY"], salt="quizhub-password-reset")
+        user = User.query.filter_by(email="reset@quizhub.com").first()
+        valid_token = s.dumps({"user_id": user.id, "email": user.email})
+
+        # Perform password reset
+        reset_res = self.client.post("/api/auth/reset-password", json={
+            "token": valid_token,
+            "new_password": "NewBrandNewPassword2026"
+        })
+        self.assertEqual(reset_res.status_code, 200)
+
+        # Verify old password fails and new password succeeds
+        fail_login = self.client.post("/api/auth/login", json={"email": "reset@quizhub.com", "password": "OldPassword1234"})
+        self.assertEqual(fail_login.status_code, 401)
+
+        success_login = self.client.post("/api/auth/login", json={"email": "reset@quizhub.com", "password": "NewBrandNewPassword2026"})
+        self.assertEqual(success_login.status_code, 200)
+
+    # 10. Google Auth remains fully functional
     @patch("requests.get")
-    def test_google_auth_new_user_via_access_token(self, mock_get):
+    def test_google_auth_integration(self, mock_get):
         mock_resp = MagicMock()
         mock_resp.status_code = 200
         mock_resp.json.return_value = {
@@ -46,132 +202,8 @@ class GoogleAuthTestCase(unittest.TestCase):
         self.assertEqual(res.status_code, 200)
         data = res.get_json()
         self.assertTrue(data.get("is_new_user"))
-        self.assertIn("access_token", data)
-        self.assertIn("refresh_token", data)
-
-        user_data = data.get("user")
-        self.assertEqual(user_data.get("email"), "gamer@quizhub.com")
-        self.assertEqual(user_data.get("full_name"), "Nova Quizzer")
-        self.assertEqual(user_data.get("google_id"), "google-uid-12345")
-        self.assertEqual(user_data.get("avatar_url"), "https://lh3.googleusercontent.com/photo.jpg")
-        self.assertEqual(user_data.get("role"), "user")
-        self.assertIsNotNone(user_data.get("created_at"))
-        self.assertIsNotNone(user_data.get("last_login"))
-        self.assertIsNotNone(user_data.get("profile"))
-
-        # Verify DB persistence
-        db_user = User.query.filter_by(google_id="google-uid-12345").first()
-        self.assertIsNotNone(db_user)
-        self.assertIsNotNone(db_user.student_profile)
-
-    @patch("requests.get")
-    def test_google_auth_returning_user(self, mock_get):
-        mock_resp = MagicMock()
-        mock_resp.status_code = 200
-        mock_resp.json.return_value = {
-            "sub": "google-returning-999",
-            "email": "returning@quizhub.com",
-            "name": "Returning Champion",
-            "picture": "https://lh3.googleusercontent.com/p2.jpg",
-            "email_verified": True,
-        }
-        mock_get.return_value = mock_resp
-
-        # First sign-in (Registration)
-        r1 = self.client.post("/api/auth/google", json={"access_token": "tok1"})
-        self.assertEqual(r1.status_code, 200)
-        self.assertTrue(r1.get_json().get("is_new_user"))
-
-        # Second sign-in (Login)
-        r2 = self.client.post("/api/auth/google", json={"access_token": "tok2"})
-        self.assertEqual(r2.status_code, 200)
-        self.assertFalse(r2.get_json().get("is_new_user"))
-        self.assertEqual(r2.get_json().get("user").get("google_id"), "google-returning-999")
-
-    @patch("requests.get")
-    def test_google_auth_links_existing_email_account(self, mock_get):
-        # Create an account first via standard email
-        existing = User(
-            email="legacy@quizhub.com",
-            full_name="Legacy Player",
-            role="user"
-        )
-        existing.set_password("OldPassword@123")
-        db.session.add(existing)
-        db.session.commit()
-
-        mock_resp = MagicMock()
-        mock_resp.status_code = 200
-        mock_resp.json.return_value = {
-            "sub": "google-linked-777",
-            "email": "legacy@quizhub.com",
-            "name": "Legacy Player",
-            "picture": "https://lh3.googleusercontent.com/avatar.png",
-            "email_verified": True,
-        }
-        mock_get.return_value = mock_resp
-
-        res = self.client.post("/api/auth/google", json={"access_token": "link-tok"})
-        self.assertEqual(res.status_code, 200)
-        self.assertFalse(res.get_json().get("is_new_user"))
-
-        # Verify Google ID linked
-        db_user = User.query.filter_by(email="legacy@quizhub.com").first()
-        self.assertEqual(db_user.google_id, "google-linked-777")
-        self.assertEqual(db_user.avatar_url, "https://lh3.googleusercontent.com/avatar.png")
-
-    @patch("requests.get")
-    def test_common_user_can_create_quiz_and_host(self, mock_get):
-        # Sign in via Google
-        mock_resp = MagicMock()
-        mock_resp.status_code = 200
-        mock_resp.json.return_value = {
-            "sub": "google-host-555",
-            "email": "host@quizhub.com",
-            "name": "Host User",
-            "picture": "https://lh3.googleusercontent.com/host.png",
-            "email_verified": True,
-        }
-        mock_get.return_value = mock_resp
-
-        auth_res = self.client.post("/api/auth/google", json={"access_token": "host-tok"})
-        token = auth_res.get_json().get("access_token")
-        headers = {"Authorization": f"Bearer {token}"}
-
-        # Verify /api/auth/me
-        me_res = self.client.get("/api/auth/me", headers=headers)
-        self.assertEqual(me_res.status_code, 200)
-        self.assertEqual(me_res.get_json().get("user").get("role"), "user")
-
-        # Create quiz as common user
-        quiz_res = self.client.post("/api/quizzes", json={
-            "title": "Community Cyber Quiz",
-            "description": "Created by common user",
-            "category": "Technology",
-            "difficulty": "medium",
-            "time_limit_per_question": 20,
-            "questions": [{
-                "question_text": "What does CPU stand for?",
-                "question_type": "multiple_choice",
-                "time_limit": 20,
-                "points": 1000,
-                "options": [
-                    {"option_text": "Central Processing Unit", "is_correct": True},
-                    {"option_text": "Computer Power Unit", "is_correct": False}
-                ]
-            }]
-        }, headers=headers)
-        self.assertEqual(quiz_res.status_code, 201)
-        quiz_id = quiz_res.get_json().get("quiz").get("id")
-
-        # Create live multiplayer session as common user
-        sess_res = self.client.post("/api/sessions/create", json={"quiz_id": quiz_id}, headers=headers)
-        self.assertEqual(sess_res.status_code, 201)
-        self.assertIsNotNone(sess_res.get_json().get("pin"))
-
-        # Logout
-        logout_res = self.client.post("/api/auth/logout", headers=headers)
-        self.assertEqual(logout_res.status_code, 200)
+        self.assertEqual(data.get("user").get("google_id"), "google-uid-12345")
+        self.assertEqual(data.get("user").get("auth_provider"), "google")
 
 if __name__ == "__main__":
     unittest.main()

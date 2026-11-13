@@ -53,6 +53,7 @@ def create_app(config_name=None):
                         "ALTER TYPE user_role_enum ADD VALUE IF NOT EXISTS 'user';",
                         "ALTER TABLE users ADD COLUMN IF NOT EXISTS google_id VARCHAR(191);",
                         "CREATE UNIQUE INDEX IF NOT EXISTS ix_users_google_id ON users (google_id) WHERE google_id IS NOT NULL;",
+                        "ALTER TABLE users ADD COLUMN IF NOT EXISTS auth_provider VARCHAR(50) DEFAULT 'email';",
                         "ALTER TABLE users ADD COLUMN IF NOT EXISTS last_login TIMESTAMP;",
                         "ALTER TABLE users ALTER COLUMN password_hash DROP NOT NULL;",
                     ]:
@@ -66,12 +67,15 @@ def create_app(config_name=None):
                     col_names = [r[1] for r in res]
                     if "google_id" not in col_names:
                         conn.execute(db.text("ALTER TABLE users ADD COLUMN google_id VARCHAR(191);"))
+                    if "auth_provider" not in col_names:
+                        conn.execute(db.text("ALTER TABLE users ADD COLUMN auth_provider VARCHAR(50) DEFAULT 'email';"))
                     if "last_login" not in col_names:
                         conn.execute(db.text("ALTER TABLE users ADD COLUMN last_login DATETIME;"))
                     conn.commit()
                 elif dialect_name == "mysql":
                     for stmt in [
                         "ALTER TABLE users ADD COLUMN IF NOT EXISTS google_id VARCHAR(191) UNIQUE;",
+                        "ALTER TABLE users ADD COLUMN IF NOT EXISTS auth_provider VARCHAR(50) DEFAULT 'email';",
                         "ALTER TABLE users ADD COLUMN IF NOT EXISTS last_login DATETIME;",
                         "ALTER TABLE users MODIFY password_hash VARCHAR(255) NULL;",
                     ]:
