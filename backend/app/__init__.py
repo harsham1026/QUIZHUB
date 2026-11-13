@@ -50,7 +50,8 @@ def create_app(config_name=None):
             with engine.connect() as conn:
                 if dialect_name == "postgresql":
                     for stmt in [
-                        "ALTER TYPE user_role_enum ADD VALUE IF NOT EXISTS 'user';",
+                        "ALTER TABLE users ALTER COLUMN role TYPE VARCHAR(50) USING role::VARCHAR;",
+                        "ALTER TABLE users ALTER COLUMN role SET DEFAULT 'user';",
                         "ALTER TABLE users ADD COLUMN IF NOT EXISTS google_id VARCHAR(191);",
                         "CREATE UNIQUE INDEX IF NOT EXISTS ix_users_google_id ON users (google_id) WHERE google_id IS NOT NULL;",
                         "ALTER TABLE users ADD COLUMN IF NOT EXISTS auth_provider VARCHAR(50) DEFAULT 'email';",
