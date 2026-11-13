@@ -7,12 +7,14 @@ class User(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     email = db.Column(db.String(191), unique=True, nullable=False, index=True)
-    password_hash = db.Column(db.String(255), nullable=False)
+    password_hash = db.Column(db.String(255), nullable=True)
     full_name = db.Column(db.String(120), nullable=False)
-    role = db.Column(db.Enum("student", "teacher", "admin", name="user_role_enum"), nullable=False, default="student")
+    role = db.Column(db.String(50), nullable=False, default="user")
+    google_id = db.Column(db.String(191), unique=True, nullable=True, index=True)
     avatar_url = db.Column(db.String(500), nullable=True)
     is_active = db.Column(db.Boolean, default=True, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    last_login = db.Column(db.DateTime, nullable=True)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     # Relationships
@@ -26,25 +28,38 @@ class User(db.Model):
         self.password_hash = generate_password_hash(password)
 
     def check_password(self, password):
+        if not self.password_hash:
+            return False
         return check_password_hash(self.password_hash, password)
 
     def to_dict(self, include_profile=True):
         data = {
             "id": self.id,
+            "google_id": self.google_id,
             "email": self.email,
             "full_name": self.full_name,
-            "role": self.role,
+            "role": self.role or "user",
             "avatar_url": self.avatar_url or f"https://api.dicebear.com/7.x/bottts/svg?seed={self.email}",
             "is_active": self.is_active,
             "created_at": self.created_at.isoformat() if self.created_at else None,
+            "last_login": self.last_login.isoformat() if self.last_login else None,
         }
         if include_profile:
-            if self.role == "student" and self.student_profile:
+            if self.student_profile:
                 data["profile"] = self.student_profile.to_dict()
-            elif self.role == "teacher" and self.teacher_profile:
+            elif self.teacher_profile:
                 data["profile"] = self.teacher_profile.to_dict()
-            elif self.role == "admin":
-                data["profile"] = {"is_admin": True}
+            else:
+                data["profile"] = {
+                    "xp": 0,
+                    "level": 1,
+                    "streak": 0,
+                    "total_quizzes_played": 0,
+                    "total_wins": 0,
+                    "accuracy_rate": 0.0,
+                    "next_level_xp": 1000,
+                    "current_level_progress": 0,
+                }
         return data
 
 

@@ -110,7 +110,7 @@ export const LandingPage = () => {
             variant="primary"
             size="lg"
             icon={Play}
-            onClick={() => navigate('/teacher')}
+            onClick={() => navigate('/create-quiz')}
           >
             Create Competition
           </NeonButton>
@@ -155,7 +155,7 @@ export const LandingPage = () => {
               step: '01',
               title: 'Host or Launch',
               desc: 'Select any public trivia deck or author your own questions. Click Start to generate a live 6-digit Game PIN and QR code.',
-              badge: 'Teacher / Host',
+              badge: 'Creator Studio',
             },
             {
               step: '02',
@@ -204,12 +204,12 @@ export const LandingPage = () => {
             },
             {
               title: 'AI Trivia Generator',
-              desc: 'Teachers can generate complete quizzes in seconds on any academic or entertainment topic via integrated Gemini AI models.',
+              desc: 'Generate complete quizzes in seconds on any academic or entertainment topic via integrated Gemini AI models.',
               icon: Sparkles,
             },
             {
               title: 'Championship Tournaments',
-              desc: 'Scheduled bracket events with participant caps, registration deadlines, and permanent trophies on student profile records.',
+              desc: 'Scheduled bracket events with participant caps, registration deadlines, and permanent trophies on user profile records.',
               icon: Trophy,
             },
             {

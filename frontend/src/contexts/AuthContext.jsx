@@ -40,6 +40,16 @@ export const AuthProvider = ({ children }) => {
     initAuth();
   }, [refreshUser]);
 
+  const loginWithGoogle = async (googlePayload) => {
+    const res = await api.post('/auth/google', googlePayload);
+    const { user: loggedInUser, access_token, refresh_token } = res.data;
+    localStorage.setItem('quizhub_access_token', access_token);
+    localStorage.setItem('quizhub_refresh_token', refresh_token);
+    localStorage.setItem('quizhub_user', JSON.stringify(loggedInUser));
+    setUser(loggedInUser);
+    return loggedInUser;
+  };
+
   const login = async (email, password) => {
     const res = await api.post('/auth/login', { email, password });
     const { user: loggedInUser, access_token, refresh_token } = res.data;
@@ -60,7 +70,12 @@ export const AuthProvider = ({ children }) => {
     return registeredUser;
   };
 
-  const logout = () => {
+  const logout = async () => {
+    try {
+      await api.post('/auth/logout');
+    } catch {
+      // ignore
+    }
     localStorage.removeItem('quizhub_access_token');
     localStorage.removeItem('quizhub_refresh_token');
     localStorage.removeItem('quizhub_user');
@@ -76,9 +91,10 @@ export const AuthProvider = ({ children }) => {
     <AuthContext.Provider
       value={{
         user,
-        role: user?.role,
+        role: user?.role || 'user',
         isAuthenticated: !!user,
         loading,
+        loginWithGoogle,
         login,
         register,
         logout,

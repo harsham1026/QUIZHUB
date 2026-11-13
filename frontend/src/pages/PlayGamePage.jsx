@@ -352,7 +352,7 @@ export const PlayGamePage = () => {
             className="w-full"
             onClick={() => {
               resetGame();
-              navigate(user?.role === 'teacher' ? '/teacher' : user?.role === 'admin' ? '/admin' : '/student');
+              navigate('/dashboard');
             }}
           >
             Back to Dashboard

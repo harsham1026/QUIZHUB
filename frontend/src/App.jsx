@@ -11,8 +11,7 @@ import LandingPage from './pages/LandingPage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
-import StudentDashboard from './pages/StudentDashboard';
-import TeacherDashboard from './pages/TeacherDashboard';
+import UserDashboard from './pages/UserDashboard';
 import AdminDashboard from './pages/AdminDashboard';
 import QuizCreatorPage from './pages/QuizCreatorPage';
 import HostGamePage from './pages/HostGamePage';
@@ -22,8 +21,8 @@ import TournamentsPage from './pages/TournamentsPage';
 import LeaderboardPage from './pages/LeaderboardPage';
 import ExplorePage from './pages/ExplorePage';
 
-const ProtectedRoute = ({ children, allowedRoles }) => {
-  const { user, role, loading } = useAuth();
+const ProtectedRoute = ({ children, requireAdmin = false }) => {
+  const { user, loading } = useAuth();
 
   if (loading) {
     return <div className="text-center py-32 text-slate-400">Loading your profile...</div>;
@@ -33,10 +32,8 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
     return <Navigate to="/login" replace />;
   }
 
-  if (allowedRoles && !allowedRoles.includes(role)) {
-    if (role === 'teacher') return <Navigate to="/teacher" replace />;
-    if (role === 'admin') return <Navigate to="/admin" replace />;
-    return <Navigate to="/student" replace />;
+  if (requireAdmin && user.role !== 'admin') {
+    return <Navigate to="/dashboard" replace />;
   }
 
   return children;
@@ -62,27 +59,25 @@ export const App = () => {
                 <Route path="/practice/:id" element={<PracticePage />} />
                 <Route path="/play" element={<PlayGamePage />} />
 
-                {/* Role Protected Routes */}
+                {/* Unified User Dashboard */}
                 <Route
-                  path="/student"
+                  path="/dashboard"
                   element={
-                    <ProtectedRoute allowedRoles={['student', 'admin']}>
-                      <StudentDashboard />
+                    <ProtectedRoute>
+                      <UserDashboard />
                     </ProtectedRoute>
                   }
                 />
-                <Route
-                  path="/teacher"
-                  element={
-                    <ProtectedRoute allowedRoles={['teacher', 'admin']}>
-                      <TeacherDashboard />
-                    </ProtectedRoute>
-                  }
-                />
+
+                {/* Legacy redirect aliases */}
+                <Route path="/student" element={<Navigate to="/dashboard" replace />} />
+                <Route path="/teacher" element={<Navigate to="/dashboard" replace />} />
+
+                {/* Quiz Creation & Hosting (Open to all common user accounts) */}
                 <Route
                   path="/create-quiz"
                   element={
-                    <ProtectedRoute allowedRoles={['teacher', 'admin']}>
+                    <ProtectedRoute>
                       <QuizCreatorPage />
                     </ProtectedRoute>
                   }
@@ -90,15 +85,17 @@ export const App = () => {
                 <Route
                   path="/host"
                   element={
-                    <ProtectedRoute allowedRoles={['teacher', 'admin']}>
+                    <ProtectedRoute>
                       <HostGamePage />
                     </ProtectedRoute>
                   }
                 />
+
+                {/* Admin metrics dashboard */}
                 <Route
                   path="/admin"
                   element={
-                    <ProtectedRoute allowedRoles={['admin']}>
+                    <ProtectedRoute requireAdmin={true}>
                       <AdminDashboard />
                     </ProtectedRoute>
                   }

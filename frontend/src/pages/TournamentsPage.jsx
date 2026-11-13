@@ -21,7 +21,7 @@ export const TournamentsPage = () => {
   const [category, setCategory] = useState('Technology');
   const [maxParticipants, setMaxParticipants] = useState(64);
 
-  const canCreate = role === 'teacher' || role === 'admin';
+  const canCreate = isAuthenticated;
 
   const fetchTournaments = async () => {
     try {

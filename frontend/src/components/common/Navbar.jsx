@@ -43,10 +43,13 @@ export const Navbar = () => {
           </Link>
 
           {/* Desktop Nav Links */}
-          <nav className="hidden md:flex items-center gap-8 text-sm font-medium text-slate-300">
+          <nav className="hidden md:flex items-center gap-7 text-sm font-medium text-slate-300">
             <Link to="/" className="hover:text-neon-cyan transition-colors">Home</Link>
             <Link to="/explore" className="hover:text-neon-cyan transition-colors flex items-center gap-1.5">
               <Compass className="w-4 h-4" /> Explore
+            </Link>
+            <Link to="/create-quiz" className="hover:text-neon-cyan transition-colors flex items-center gap-1.5">
+              <Zap className="w-4 h-4 text-neon-cyan" /> Create Quiz
             </Link>
             <Link to="/tournaments" className="hover:text-neon-cyan transition-colors flex items-center gap-1.5">
               <Trophy className="w-4 h-4 text-neon-amber" /> Tournaments
@@ -70,18 +73,19 @@ export const Navbar = () => {
             {isAuthenticated ? (
               <div className="flex items-center gap-3">
                 <Link
-                  to={role === 'teacher' ? '/teacher' : role === 'admin' ? '/admin' : '/student'}
-                  className="flex items-center gap-2.5 px-3 py-1.5 rounded-xl glass-panel-interactive border-white/10"
+                  to="/dashboard"
+                  className="flex items-center gap-2.5 px-3 py-1.5 rounded-xl glass-panel-interactive border-white/10 hover:border-neon-cyan/40 transition-colors"
                 >
                   <img
                     src={user?.avatar_url || `https://api.dicebear.com/7.x/bottts/svg?seed=${user?.email}`}
                     alt="avatar"
-                    className="w-7 h-7 rounded-lg bg-surfaceLight border border-neon-blue/30"
+                    className="w-7 h-7 rounded-lg bg-surfaceLight border border-neon-cyan/40 object-cover"
+                    referrerPolicy="no-referrer"
                   />
                   <div className="text-left">
                     <p className="text-xs font-semibold text-white leading-tight">{user?.full_name?.split(' ')[0]}</p>
-                    <Badge variant={role === 'admin' ? 'pink' : role === 'teacher' ? 'purple' : 'blue'} className="text-[10px] py-0 px-1.5">
-                      {role}
+                    <Badge variant="cyan" className="text-[10px] py-0 px-1.5">
+                      User
                     </Badge>
                   </div>
                 </Link>
@@ -101,9 +105,9 @@ export const Navbar = () => {
                 <NeonButton
                   variant="primary"
                   size="sm"
-                  onClick={() => navigate('/register')}
+                  onClick={() => navigate('/login')}
                 >
-                  Get Started
+                  Continue with Google
                 </NeonButton>
               </div>
             )}
@@ -125,6 +129,7 @@ export const Navbar = () => {
           <div className="md:hidden glass-panel border-b border-white/10 px-6 py-4 space-y-4">
             <Link to="/" onClick={() => setMobileMenuOpen(false)} className="block text-slate-200">Home</Link>
             <Link to="/explore" onClick={() => setMobileMenuOpen(false)} className="block text-slate-200">Explore</Link>
+            <Link to="/create-quiz" onClick={() => setMobileMenuOpen(false)} className="block text-slate-200">Create Quiz</Link>
             <Link to="/tournaments" onClick={() => setMobileMenuOpen(false)} className="block text-slate-200">Tournaments</Link>
             <Link to="/leaderboard" onClick={() => setMobileMenuOpen(false)} className="block text-slate-200">Leaderboard</Link>
             <div className="pt-2 border-t border-white/10 flex flex-col gap-2">
@@ -134,18 +139,17 @@ export const Navbar = () => {
               {isAuthenticated ? (
                 <div className="flex items-center justify-between pt-2">
                   <Link
-                    to={role === 'teacher' ? '/teacher' : role === 'admin' ? '/admin' : '/student'}
+                    to="/dashboard"
                     onClick={() => setMobileMenuOpen(false)}
-                    className="text-sm font-medium text-neon-blue"
+                    className="text-sm font-medium text-neon-cyan"
                   >
-                    Go to Dashboard ({user?.full_name})
+                    Go to Dashboard ({user?.full_name?.split(' ')[0]})
                   </Link>
                   <button onClick={logout} className="text-sm text-red-400">Logout</button>
                 </div>
               ) : (
                 <div className="flex gap-2 pt-2">
-                  <Link to="/login" onClick={() => setMobileMenuOpen(false)} className="flex-1 text-center py-2 text-sm bg-white/5 rounded-lg">Sign In</Link>
-                  <Link to="/register" onClick={() => setMobileMenuOpen(false)} className="flex-1 text-center py-2 text-sm bg-neon-blue text-slate-950 font-bold rounded-lg">Register</Link>
+                  <Link to="/login" onClick={() => setMobileMenuOpen(false)} className="w-full text-center py-2 text-sm bg-white text-slate-900 font-bold rounded-lg shadow-glow-cyan">Continue with Google</Link>
                 </div>
               )}
             </div>

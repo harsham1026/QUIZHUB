@@ -18,11 +18,15 @@ def role_required(*allowed_roles):
             if not user or not user.is_active:
                 return jsonify({"error": "Forbidden", "message": "Account inactive or not found"}), 403
 
-            if user.role not in allowed_roles:
-                return jsonify({
-                    "error": "Forbidden",
-                    "message": f"Access denied. Requires one of roles: {', '.join(allowed_roles)}"
-                }), 403
+            # Common User account model:
+            # All active users have access to all general features (quizzes, sessions, tournaments, AI, etc.).
+            # Only enforce if 'admin' is exclusively required.
+            if allowed_roles and list(allowed_roles) == ["admin"]:
+                if user.role != "admin":
+                    return jsonify({
+                        "error": "Forbidden",
+                        "message": "Access denied. Admin privileges required."
+                    }), 403
 
             return fn(*args, **kwargs)
         return wrapper

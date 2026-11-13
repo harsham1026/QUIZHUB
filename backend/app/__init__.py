@@ -45,6 +45,42 @@ def create_app(config_name=None):
             import app.sockets.game_events  # noqa: F401
         try:
             db.create_all()
+            engine = db.engine
+            dialect_name = engine.dialect.name
+            with engine.connect() as conn:
+                if dialect_name == "postgresql":
+                    for stmt in [
+                        "ALTER TYPE user_role_enum ADD VALUE IF NOT EXISTS 'user';",
+                        "ALTER TABLE users ADD COLUMN IF NOT EXISTS google_id VARCHAR(191);",
+                        "CREATE UNIQUE INDEX IF NOT EXISTS ix_users_google_id ON users (google_id) WHERE google_id IS NOT NULL;",
+                        "ALTER TABLE users ADD COLUMN IF NOT EXISTS last_login TIMESTAMP;",
+                        "ALTER TABLE users ALTER COLUMN password_hash DROP NOT NULL;",
+                    ]:
+                        try:
+                            conn.execute(db.text(stmt))
+                            conn.commit()
+                        except Exception:
+                            pass
+                elif dialect_name == "sqlite":
+                    res = conn.execute(db.text("PRAGMA table_info(users);")).fetchall()
+                    col_names = [r[1] for r in res]
+                    if "google_id" not in col_names:
+                        conn.execute(db.text("ALTER TABLE users ADD COLUMN google_id VARCHAR(191);"))
+                    if "last_login" not in col_names:
+                        conn.execute(db.text("ALTER TABLE users ADD COLUMN last_login DATETIME;"))
+                    conn.commit()
+                elif dialect_name == "mysql":
+                    for stmt in [
+                        "ALTER TABLE users ADD COLUMN IF NOT EXISTS google_id VARCHAR(191) UNIQUE;",
+                        "ALTER TABLE users ADD COLUMN IF NOT EXISTS last_login DATETIME;",
+                        "ALTER TABLE users MODIFY password_hash VARCHAR(255) NULL;",
+                    ]:
+                        try:
+                            conn.execute(db.text(stmt))
+                            conn.commit()
+                        except Exception:
+                            pass
+
             from app.seed_helper import seed_if_empty
             seed_if_empty()
         except Exception as e:
