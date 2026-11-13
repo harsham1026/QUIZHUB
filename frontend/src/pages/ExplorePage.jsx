@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Clock, Compass, Layers, Filter, Play } from 'lucide-react';
+import { Search, Clock, Compass, Layers, Filter, Play, Edit3 } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
 import api from '../services/api';
 import GlassCard from '../components/common/GlassCard';
 import NeonButton from '../components/common/NeonButton';
@@ -8,6 +9,7 @@ import Badge from '../components/common/Badge';
 
 export const ExplorePage = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [quizzes, setQuizzes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -147,14 +149,27 @@ export const ExplorePage = () => {
                 <span className="text-xs text-slate-400 flex items-center gap-1 font-mono">
                   <Clock className="w-3.5 h-3.5 text-neon-blue" /> {q.time_limit_per_question}s / Q
                 </span>
-                <NeonButton
-                  variant="primary"
-                  size="sm"
-                  icon={Play}
-                  onClick={() => navigate(`/practice/${q.id}`)}
-                >
-                  Play Solo
-                </NeonButton>
+                <div className="flex items-center gap-2">
+                  {user?.id === q.creator_id && (
+                    <NeonButton
+                      variant="outline"
+                      size="sm"
+                      icon={Edit3}
+                      onClick={() => navigate(`/create-quiz?edit=${q.id}`)}
+                      className="border-neon-purple/40 text-neon-purple hover:bg-neon-purple/10"
+                    >
+                      Edit
+                    </NeonButton>
+                  )}
+                  <NeonButton
+                    variant="primary"
+                    size="sm"
+                    icon={Play}
+                    onClick={() => navigate(`/practice/${q.id}`)}
+                  >
+                    Play Solo
+                  </NeonButton>
+                </div>
               </div>
             </GlassCard>
           ))}

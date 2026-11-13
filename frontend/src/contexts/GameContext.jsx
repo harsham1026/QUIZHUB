@@ -19,6 +19,9 @@ export const GameProvider = ({ children }) => {
   const [selectedOptionIds, setSelectedOptionIds] = useState([]);
   const [hasAnswered, setHasAnswered] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const [quizId, setQuizId] = useState(null);
+  const [quizTitle, setQuizTitle] = useState('');
+  const [totalQuestions, setTotalQuestions] = useState(0);
 
   const lastQuestionIdRef = useRef(null);
   const advancingRef = useRef(false);
@@ -51,6 +54,16 @@ export const GameProvider = ({ children }) => {
       if (state.full_standings?.length) {
         setLeaderboard(state.full_standings);
       }
+    }
+
+    if (state.quiz_id) {
+      setQuizId(state.quiz_id);
+    }
+    if (state.quiz_title) {
+      setQuizTitle(state.quiz_title);
+    }
+    if (state.total_questions !== undefined) {
+      setTotalQuestions(state.total_questions);
     }
 
     setGameStatus(state.status || 'lobby');
@@ -87,6 +100,9 @@ export const GameProvider = ({ children }) => {
 
   const joinGame = async (gamePin, nickname) => {
     const cleanPin = gamePin.trim().toUpperCase();
+    setQuizId(null);
+    setQuizTitle('');
+    setTotalQuestions(0);
     setErrorMessage('');
     try {
       const res = await api.post(`/sessions/${cleanPin}/join`, {
@@ -121,6 +137,9 @@ export const GameProvider = ({ children }) => {
     setPin(cleanPin);
     setIsHost(true);
     setParticipantId(null);
+    setQuizId(null);
+    setQuizTitle('');
+    setTotalQuestions(0);
     setErrorMessage('');
     try {
       const res = await api.get(`/sessions/${cleanPin}/state`);
@@ -199,6 +218,9 @@ export const GameProvider = ({ children }) => {
     setAnswersCount(0);
     setSelectedOptionIds([]);
     setHasAnswered(false);
+    setQuizId(null);
+    setQuizTitle('');
+    setTotalQuestions(0);
     setErrorMessage('');
   };
 
@@ -218,6 +240,9 @@ export const GameProvider = ({ children }) => {
         selectedOptionIds,
         hasAnswered,
         errorMessage,
+        quizId,
+        quizTitle,
+        totalQuestions,
         joinGame,
         initHost,
         startGame,

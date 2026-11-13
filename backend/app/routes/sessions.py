@@ -218,7 +218,9 @@ def _build_session_state(session: QuizSession, participant_id=None) -> dict:
         "session_id": session.id,
         "pin": session.pin,
         "status": session.status,
+        "quiz_id": session.quiz_id,
         "quiz_title": session.quiz.title if session.quiz else "",
+        "host_id": session.host_id,
         "total_questions": total_questions,
         "current_question_index": q_idx,
         "participants": participants_data,
@@ -264,6 +266,7 @@ def create_session():
         "message": "Game session created",
         "session": session.to_dict(),
         "pin": pin,
+        "quiz_id": quiz.id,
     }), 201
 
 

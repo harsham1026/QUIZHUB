@@ -9,7 +9,8 @@ import {
   Sparkles,
   Flame,
   Copy,
-  AlertCircle
+  AlertCircle,
+  Edit3
 } from 'lucide-react';
 import { useGame } from '../contexts/GameContext';
 import GlassCard from '../components/common/GlassCard';
@@ -21,6 +22,7 @@ export const HostGamePage = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const pin = searchParams.get('pin');
+  const searchQuizId = searchParams.get('quiz_id');
   const [copied, setCopied] = useState(false);
 
   const {
@@ -34,7 +36,12 @@ export const HostGamePage = () => {
     finalPodium,
     answersCount,
     errorMessage,
+    quizId,
+    quizTitle,
+    totalQuestions,
   } = useGame();
+
+  const activeQuizId = quizId || searchQuizId;
 
   useEffect(() => {
     if (pin) {
@@ -56,8 +63,8 @@ export const HostGamePage = () => {
           <AlertCircle className="w-12 h-12 text-neon-pink mx-auto" />
           <h2 className="text-2xl font-bold font-heading text-white">Session Unavailable</h2>
           <p className="text-sm text-slate-400">{errorMessage}</p>
-          <NeonButton variant="outline" size="md" onClick={() => navigate('/teacher')}>
-            Return to Teacher Studio
+          <NeonButton variant="outline" size="md" onClick={() => navigate('/dashboard')}>
+            Return to Dashboard
           </NeonButton>
         </GlassCard>
       </div>
@@ -69,9 +76,47 @@ export const HostGamePage = () => {
     return (
       <div className="max-w-5xl mx-auto px-4 py-12 text-center relative z-10 space-y-8">
         <GlassCard className="p-10 border-neon-cyan/40 shadow-glow-cyan">
-          <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-neon-cyan/10 border border-neon-cyan/30 text-neon-cyan text-xs font-mono font-bold uppercase mb-4">
-            <Sparkles className="w-3.5 h-3.5" /> Competition Lobby Active
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 mb-6 pb-4 border-b border-white/10">
+            <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-neon-cyan/10 border border-neon-cyan/30 text-neon-cyan text-xs font-mono font-bold uppercase">
+              <Sparkles className="w-3.5 h-3.5" /> Competition Lobby Active
+            </div>
+
+            {activeQuizId && (
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => window.open(`/create-quiz?edit=${activeQuizId}`, '_blank')}
+                  className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-neon-purple/20 border border-neon-purple/40 text-xs font-bold text-neon-purple hover:bg-neon-purple/30 transition-all shadow-sm"
+                  title="Open quiz editor in a new tab so this lobby stays active"
+                >
+                  <Edit3 className="w-3.5 h-3.5" />
+                  Edit Quiz
+                </button>
+                <button
+                  type="button"
+                  onClick={() => navigate(`/create-quiz?edit=${activeQuizId}`)}
+                  className="text-xs text-slate-400 hover:text-white underline transition-colors px-1"
+                >
+                  Leave & edit
+                </button>
+              </div>
+            )}
           </div>
+
+          {/* Quiz Title & Info */}
+          {quizTitle && (
+            <div className="mb-4 text-center">
+              <span className="text-[11px] font-mono text-slate-400 uppercase tracking-widest block">HOSTING QUIZ</span>
+              <h1 className="text-2xl sm:text-3xl font-black font-heading text-white tracking-wide mt-0.5">
+                {quizTitle}
+              </h1>
+              {totalQuestions > 0 && (
+                <span className="inline-block mt-1 text-xs font-mono text-neon-cyan font-semibold">
+                  {totalQuestions} Questions Loaded
+                </span>
+              )}
+            </div>
+          )}
 
           <h2 className="text-xl sm:text-2xl font-bold text-slate-300">
             JOIN AT <span className="text-white font-mono">{window.location.host}/play</span> WITH PIN:
@@ -272,15 +317,26 @@ export const HostGamePage = () => {
     return (
       <div className="relative z-10">
         <Podium podium={finalPodium} />
-        <div className="flex justify-center pb-12">
+        <div className="flex flex-wrap justify-center pb-12 gap-3">
           <NeonButton
             variant="cyan"
             size="lg"
             icon={CheckCircle}
-            onClick={() => navigate('/teacher')}
+            onClick={() => navigate('/dashboard')}
           >
-            Return to Teacher Studio
+            Return to Dashboard
           </NeonButton>
+          {activeQuizId && (
+            <NeonButton
+              variant="outline"
+              size="lg"
+              icon={Edit3}
+              onClick={() => navigate(`/create-quiz?edit=${activeQuizId}`)}
+              className="border-neon-purple/40 text-neon-purple hover:bg-neon-purple/10"
+            >
+              Edit Quiz
+            </NeonButton>
+          )}
         </div>
       </div>
     );

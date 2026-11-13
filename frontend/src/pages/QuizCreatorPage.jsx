@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams, useParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
   Plus,
@@ -21,8 +21,9 @@ import Badge from '../components/common/Badge';
 
 export const QuizCreatorPage = () => {
   const navigate = useNavigate();
+  const { id: routeId } = useParams();
   const [searchParams] = useSearchParams();
-  const editId = searchParams.get('edit');
+  const editId = routeId || searchParams.get('edit');
   const isAiMode = searchParams.get('mode') === 'ai';
 
   // Quiz Meta
@@ -80,7 +81,25 @@ export const QuizCreatorPage = () => {
           setTimeLimit(q.time_limit_per_question);
           setCoverImage(q.cover_image || '');
           if (q.questions && q.questions.length > 0) {
-            setQuestions(q.questions);
+            setQuestions(
+              q.questions.map((quest) => ({
+                question_text: quest.question_text || '',
+                question_type: quest.question_type || 'multiple_choice',
+                time_limit: quest.time_limit || q.time_limit_per_question || 30,
+                points: quest.points || 1000,
+                options: (quest.options && quest.options.length > 0)
+                  ? quest.options.map((opt) => ({
+                      option_text: opt.option_text || '',
+                      is_correct: Boolean(opt.is_correct),
+                    }))
+                  : [
+                      { option_text: '', is_correct: true },
+                      { option_text: '', is_correct: false },
+                      { option_text: '', is_correct: false },
+                      { option_text: '', is_correct: false },
+                    ],
+              }))
+            );
           }
         } catch (err) {
           console.error('Failed to load quiz for edit:', err);
@@ -227,7 +246,7 @@ export const QuizCreatorPage = () => {
         await api.post('/quizzes', payload);
       }
 
-      navigate('/teacher');
+      navigate('/dashboard');
     } catch (err) {
       setErrorMessage(err.response?.data?.message || 'Failed to save quiz');
     } finally {
@@ -241,14 +260,19 @@ export const QuizCreatorPage = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <button
-            onClick={() => navigate('/teacher')}
+            onClick={() => navigate('/dashboard')}
             className="p-2 rounded-xl glass-panel text-slate-400 hover:text-white"
           >
             <ArrowLeft className="w-5 h-5" />
           </button>
           <div>
-            <h1 className="text-3xl font-black font-heading text-white">
+            <h1 className="text-3xl font-black font-heading text-white flex items-center gap-2">
               {editId ? 'EDIT QUIZ' : 'QUIZ BUILDER'}
+              {editId && (
+                <span className="text-xs px-2.5 py-0.5 rounded-full bg-neon-cyan/20 border border-neon-cyan/40 text-neon-cyan font-mono font-bold">
+                  Editing #{editId}
+                </span>
+              )}
             </h1>
             <p className="text-xs text-slate-400">Design competitive questions, point weights, and timers</p>
           </div>

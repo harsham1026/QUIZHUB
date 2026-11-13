@@ -95,7 +95,7 @@ export const UserDashboard = () => {
         session_type: 'live_multiplayer',
       });
       const newPin = res.data.pin;
-      navigate(`/host?pin=${newPin}`);
+      navigate(`/host?pin=${newPin}&quiz_id=${quizId}`);
     } catch (err) {
       alert(err.response?.data?.message || 'Failed to start live competition');
     } finally {
@@ -521,22 +521,40 @@ export const UserDashboard = () => {
                   </div>
 
                   <div className="mt-6 pt-4 border-t border-white/10 space-y-3">
-                    <NeonButton
-                      variant="primary"
-                      size="sm"
-                      icon={Play}
-                      className="w-full"
-                      loading={launchingId === quiz.id}
-                      onClick={() => handleStartCompetition(quiz.id)}
-                    >
-                      Host Live Match
-                    </NeonButton>
+                    <div className="grid grid-cols-2 gap-2">
+                      <NeonButton
+                        variant="primary"
+                        size="sm"
+                        icon={Play}
+                        className="w-full"
+                        loading={launchingId === quiz.id}
+                        onClick={() => handleStartCompetition(quiz.id)}
+                      >
+                        Host Match
+                      </NeonButton>
+                      <NeonButton
+                        variant="outline"
+                        size="sm"
+                        icon={Edit3}
+                        className="w-full text-neon-cyan border-neon-cyan/40 hover:bg-neon-cyan/10"
+                        onClick={() => navigate(`/create-quiz?edit=${quiz.id}`)}
+                      >
+                        Edit Quiz
+                      </NeonButton>
+                    </div>
 
                     <div className="flex items-center justify-between text-xs pt-1">
                       <Link to={`/practice/${quiz.id}`} className="text-slate-400 hover:text-white transition-colors">
                         Preview Solo
                       </Link>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          onClick={() => navigate(`/create-quiz?edit=${quiz.id}`)}
+                          className="p-1.5 text-slate-400 hover:text-neon-cyan hover:bg-white/5 rounded-lg transition-colors"
+                          title="Edit Quiz"
+                        >
+                          <Edit3 className="w-3.5 h-3.5" />
+                        </button>
                         <button
                           onClick={() => handleDuplicate(quiz.id)}
                           className="p-1.5 text-slate-400 hover:text-white hover:bg-white/5 rounded-lg transition-colors"

@@ -83,6 +83,14 @@ export const App = () => {
                   }
                 />
                 <Route
+                  path="/edit-quiz/:id"
+                  element={
+                    <ProtectedRoute>
+                      <QuizCreatorPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
                   path="/host"
                   element={
                     <ProtectedRoute>
