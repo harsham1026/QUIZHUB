@@ -10,7 +10,10 @@ import {
   Flame,
   Copy,
   AlertCircle,
-  Edit3
+  Edit3,
+  Download,
+  Trophy,
+  FileText
 } from 'lucide-react';
 import { useGame } from '../contexts/GameContext';
 import GlassCard from '../components/common/GlassCard';
@@ -34,6 +37,7 @@ export const HostGamePage = () => {
     currentQuestion,
     leaderboard,
     finalPodium,
+    fullStandings,
     answersCount,
     errorMessage,
     quizId,
@@ -312,32 +316,177 @@ export const HostGamePage = () => {
     );
   }
 
-  // GAME COMPLETED (FINAL PODIUM)
+  // GAME COMPLETED (FINAL PODIUM & TOURNAMENT REPORT)
   if (gameStatus === 'completed') {
+    const standingsList = (fullStandings && fullStandings.length > 0) ? fullStandings : leaderboard;
+
+    const downloadHostReport = () => {
+      const dateStr = new Date().toLocaleString();
+      let csv = '==================================================\n';
+      csv += 'QUIZHUB HOST TOURNAMENT REPORT\n';
+      csv += '==================================================\n';
+      csv += `Tournament Title,"${(quizTitle || 'Live Competition').replace(/"/g, '""')}"\n`;
+      csv += `Room PIN,${pin}\n`;
+      csv += `Completed At,"${dateStr}"\n`;
+      csv += `Total Competitors,${standingsList.length}\n`;
+      csv += `Total Questions,${totalQuestions || 0}\n\n`;
+
+      csv += 'COMPLETE ROSTER RESULTS\n';
+      csv += 'Rank,Participant Nickname,Final Score,Correct Count,Incorrect Count,Avg Speed (s),XP Awarded\n';
+      standingsList.forEach((p, idx) => {
+        const pRank = p.final_rank || p.rank || (idx + 1);
+        const pScore = p.final_score ?? p.score ?? 0;
+        const pCorrect = p.correct_count ?? '-';
+        const pIncorrect = p.incorrect_count ?? '-';
+        const pSpeed = p.average_speed ?? '-';
+        const pXp = p.xp_earned ?? (Math.floor(pScore / 10) + 50);
+        csv += `${pRank},"${p.nickname}",${pScore},${pCorrect},${pIncorrect},${pSpeed},+${pXp} XP\n`;
+      });
+
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `QuizHub_HostReport_PIN_${pin || 'match'}_${Date.now()}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    };
+
     return (
-      <div className="relative z-10">
+      <div className="max-w-4xl mx-auto px-4 py-10 relative z-10 space-y-8">
+        {/* Championship Podium */}
         <Podium podium={finalPodium} />
-        <div className="flex flex-wrap justify-center pb-12 gap-3">
-          <NeonButton
-            variant="cyan"
-            size="lg"
-            icon={CheckCircle}
-            onClick={() => navigate('/dashboard')}
-          >
-            Return to Dashboard
-          </NeonButton>
-          {activeQuizId && (
+
+        {/* Host Control & Export Action Card */}
+        <GlassCard className="p-8 border-neon-cyan/40 shadow-glow-cyan text-center">
+          <div className="inline-flex p-3 rounded-2xl bg-neon-cyan/10 border border-neon-cyan/30 text-neon-cyan mb-3">
+            <Trophy className="w-10 h-10 animate-bounce" />
+          </div>
+          <span className="text-xs font-mono text-neon-cyan uppercase tracking-widest block font-bold">
+            HOST TOURNAMENT WRAP-UP
+          </span>
+          <h2 className="text-3xl sm:text-4xl font-black font-heading text-white mt-1">
+            {quizTitle || 'Live Tournament Match'}
+          </h2>
+          <p className="text-slate-300 text-sm mt-1">
+            The match has concluded. You can download the full competitor roster report below or manage the quiz.
+          </p>
+
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-6 font-mono">
+            <div className="p-4 rounded-xl bg-surface border border-white/10">
+              <span className="text-xs text-slate-400 block font-sans">TOTAL PLAYERS</span>
+              <span className="text-2xl sm:text-3xl font-black text-neon-cyan mt-1 block">
+                {standingsList.length}
+              </span>
+            </div>
+            <div className="p-4 rounded-xl bg-surface border border-white/10">
+              <span className="text-xs text-slate-400 block font-sans">QUESTIONS</span>
+              <span className="text-2xl sm:text-3xl font-black text-neon-purple mt-1 block">
+                {totalQuestions || 0}
+              </span>
+            </div>
+            <div className="p-4 rounded-xl bg-surface border border-white/10">
+              <span className="text-xs text-slate-400 block font-sans">ROOM PIN</span>
+              <span className="text-2xl sm:text-3xl font-black text-neon-amber mt-1 block">
+                {pin}
+              </span>
+            </div>
+            <div className="p-4 rounded-xl bg-surface border border-white/10">
+              <span className="text-xs text-slate-400 block font-sans">TOP SCORE</span>
+              <span className="text-2xl sm:text-3xl font-black text-neon-emerald mt-1 block">
+                {standingsList[0]?.final_score ?? standingsList[0]?.score ?? 0}
+              </span>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center justify-center gap-3 mt-8 pt-6 border-t border-white/10">
+            <NeonButton
+              variant="primary"
+              size="md"
+              icon={Download}
+              onClick={downloadHostReport}
+              className="shadow-glow-cyan"
+            >
+              Download Full Report (.CSV)
+            </NeonButton>
+            {activeQuizId && (
+              <NeonButton
+                variant="outline"
+                size="md"
+                icon={Edit3}
+                onClick={() => navigate(`/create-quiz?edit=${activeQuizId}`)}
+                className="border-neon-purple/40 text-neon-purple hover:bg-neon-purple/10"
+              >
+                Edit Quiz
+              </NeonButton>
+            )}
             <NeonButton
               variant="outline"
-              size="lg"
-              icon={Edit3}
-              onClick={() => navigate(`/create-quiz?edit=${activeQuizId}`)}
-              className="border-neon-purple/40 text-neon-purple hover:bg-neon-purple/10"
+              size="md"
+              icon={CheckCircle}
+              onClick={() => navigate('/dashboard')}
             >
-              Edit Quiz
+              Return to Dashboard
             </NeonButton>
-          )}
-        </div>
+          </div>
+        </GlassCard>
+
+        {/* Complete Competitor Standings Table */}
+        <GlassCard className="p-6 border-white/10">
+          <div className="flex items-center justify-between mb-4 px-2">
+            <div>
+              <h3 className="text-lg font-bold font-heading text-white flex items-center gap-2">
+                <Users className="w-5 h-5 text-neon-blue" />
+                COMPLETE COMPETITOR SCOREBOARD
+              </h3>
+              <p className="text-xs text-slate-400">All players, scores, accuracy, and XP awarded</p>
+            </div>
+            <span className="text-xs font-mono px-3 py-1 rounded-full bg-surface border border-white/10 text-slate-300">
+              {standingsList.length} Gladiators
+            </span>
+          </div>
+
+          <div className="space-y-2">
+            {standingsList.map((p, idx) => {
+              const rank = p.final_rank || p.rank || (idx + 1);
+              const pScore = p.final_score ?? p.score ?? 0;
+              const pXp = p.xp_earned ?? (Math.floor(pScore / 10) + 50);
+
+              return (
+                <div
+                  key={p.id || idx}
+                  className="p-3.5 rounded-xl border glass-panel border-white/5 flex items-center justify-between"
+                >
+                  <div className="flex items-center gap-3.5">
+                    <span className={`w-8 h-8 rounded-lg flex items-center justify-center font-heading font-black text-sm ${
+                      rank === 1 ? 'bg-amber-400/20 text-amber-300 border border-amber-400/40' :
+                      rank === 2 ? 'bg-slate-300/20 text-slate-200 border border-slate-300/40' :
+                      rank === 3 ? 'bg-amber-700/20 text-amber-400 border border-amber-700/40' :
+                      'bg-surface text-slate-400 border border-white/5'
+                    }`}>
+                      #{rank}
+                    </span>
+                    <img
+                      src={`https://api.dicebear.com/7.x/bottts/svg?seed=${p.nickname}`}
+                      alt={p.nickname}
+                      className="w-9 h-9 rounded-lg bg-surface border border-white/10"
+                    />
+                    <div>
+                      <span className="font-bold text-white text-sm block">{p.nickname}</span>
+                      <span className="text-[11px] font-mono text-neon-purple">+{pXp} XP Awarded</span>
+                    </div>
+                  </div>
+
+                  <span className="text-lg font-mono font-black text-neon-cyan">
+                    {pScore} PTS
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </GlassCard>
       </div>
     );
   }

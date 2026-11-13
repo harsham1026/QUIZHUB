@@ -212,7 +212,23 @@ def _build_session_state(session: QuizSession, participant_id=None) -> dict:
                 }
                 for idx, p in enumerate(participants_data[:3])
             ]
-            full_standings = participants_data
+            full_standings = [
+                {
+                    "id": p.get("id"),
+                    "session_id": session.id,
+                    "user_id": p.get("user_id"),
+                    "nickname": p.get("nickname"),
+                    "final_score": p.get("score", 0),
+                    "score": p.get("score", 0),
+                    "final_rank": idx + 1,
+                    "rank": idx + 1,
+                    "correct_count": p.get("correct_count", 0),
+                    "incorrect_count": max(0, total_questions - p.get("correct_count", 0)),
+                    "xp_earned": p.get("score", 0) // 10 + 50,
+                    "average_speed": 0.0,
+                }
+                for idx, p in enumerate(participants_data)
+            ]
 
     return {
         "session_id": session.id,

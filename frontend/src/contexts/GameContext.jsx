@@ -15,6 +15,7 @@ export const GameProvider = ({ children }) => {
   const [questionResult, setQuestionResult] = useState(null);
   const [leaderboard, setLeaderboard] = useState([]);
   const [finalPodium, setFinalPodium] = useState([]);
+  const [fullStandings, setFullStandings] = useState([]);
   const [answersCount, setAnswersCount] = useState(0);
   const [selectedOptionIds, setSelectedOptionIds] = useState([]);
   const [hasAnswered, setHasAnswered] = useState(false);
@@ -51,8 +52,10 @@ export const GameProvider = ({ children }) => {
 
     if (state.status === 'completed') {
       setFinalPodium(state.final_podium || []);
-      if (state.full_standings?.length) {
-        setLeaderboard(state.full_standings);
+      const standings = state.full_standings || state.leaderboard || [];
+      setFullStandings(standings);
+      if (standings.length) {
+        setLeaderboard(standings);
       }
     }
 
@@ -131,6 +134,7 @@ export const GameProvider = ({ children }) => {
     setQuestionResult(null);
     setLeaderboard([]);
     setFinalPodium([]);
+    setFullStandings([]);
     setAnswersCount(0);
     setSelectedOptionIds([]);
     setHasAnswered(false);
@@ -215,6 +219,7 @@ export const GameProvider = ({ children }) => {
     setQuestionResult(null);
     setLeaderboard([]);
     setFinalPodium([]);
+    setFullStandings([]);
     setAnswersCount(0);
     setSelectedOptionIds([]);
     setHasAnswered(false);
@@ -236,6 +241,7 @@ export const GameProvider = ({ children }) => {
         questionResult,
         leaderboard,
         finalPodium,
+        fullStandings,
         answersCount,
         selectedOptionIds,
         hasAnswered,

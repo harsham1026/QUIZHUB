@@ -7,13 +7,20 @@ import {
   CheckCircle,
   XCircle,
   Award,
-  Send
+  Send,
+  Download,
+  Trophy,
+  Users,
+  RotateCcw,
+  Flame,
+  FileText
 } from 'lucide-react';
 import { useGame } from '../contexts/GameContext';
 import { useAuth } from '../contexts/AuthContext';
 import GlassCard from '../components/common/GlassCard';
 import NeonButton from '../components/common/NeonButton';
 import TimerRing from '../components/game/TimerRing';
+import Podium from '../components/game/Podium';
 
 export const PlayGamePage = () => {
   const [searchParams] = useSearchParams();
@@ -34,6 +41,10 @@ export const PlayGamePage = () => {
     errorMessage,
     resetGame,
     leaderboard,
+    finalPodium,
+    fullStandings,
+    quizTitle,
+    totalQuestions,
   } = useGame();
 
   const [inputPin, setInputPin] = useState(initialPin);
@@ -316,47 +327,197 @@ export const PlayGamePage = () => {
 
   // 5. GAME COMPLETED
   if (gameStatus === 'completed') {
-    const myStanding = leaderboard.find(
+    const standingsList = (fullStandings && fullStandings.length > 0) ? fullStandings : leaderboard;
+    const myStanding = standingsList.find(
       (s) => s.id === participantId || s.nickname === nickname
     );
+    const myRank = myStanding?.final_rank || myStanding?.rank || 1;
+    const myScore = myStanding?.final_score ?? myStanding?.score ?? 0;
+    const myXp = myStanding?.xp_earned ?? Math.round(myScore / 10 + (myRank === 1 ? 300 : myRank === 2 ? 200 : myRank === 3 ? 100 : 50));
+
+    const downloadPlayerReport = () => {
+      const dateStr = new Date().toLocaleString();
+      let csv = '==================================================\n';
+      csv += 'QUIZHUB MULTIPLAYER BATTLE REPORT\n';
+      csv += '==================================================\n';
+      csv += `Competition Title,"${(quizTitle || 'Live Multiplayer Match').replace(/"/g, '""')}"\n`;
+      csv += `Room PIN,${pin}\n`;
+      csv += `Completed At,"${dateStr}"\n`;
+      csv += `Player Nickname,"${nickname}"\n`;
+      csv += `Final Rank,#${myRank}\n`;
+      csv += `Final Score,${myScore} PTS\n`;
+      csv += `XP Awarded,+${myXp} XP\n`;
+      csv += `Total Competitors,${standingsList.length}\n\n`;
+
+      csv += 'COMPLETE MATCH STANDINGS\n';
+      csv += 'Rank,Player Nickname,Final Score,XP Awarded,Result\n';
+      standingsList.forEach((p, idx) => {
+        const pRank = p.final_rank || p.rank || (idx + 1);
+        const pScore = p.final_score ?? p.score ?? 0;
+        const pXp = p.xp_earned ?? (Math.floor(pScore / 10) + 50);
+        const isMe = (p.id === participantId || p.nickname === nickname) ? ' (YOU)' : '';
+        csv += `${pRank},"${p.nickname}${isMe}",${pScore},+${pXp} XP,${pRank <= 3 ? 'Podium Winner' : 'Gladiator'}\n`;
+      });
+
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `QuizHub_Match_${pin || 'battle'}_${Date.now()}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    };
 
     return (
-      <div className="max-w-md mx-auto px-4 py-16 text-center relative z-10">
-        <GlassCard className="p-8 border-neon-amber/40 shadow-glow-amber space-y-6">
-          <Award className="w-16 h-16 text-neon-amber mx-auto animate-bounce" />
-          <h2 className="text-3xl font-black font-heading text-white">BATTLE FINISHED!</h2>
-          <p className="text-slate-300 text-sm">
-            Awesome match, <span className="text-neon-cyan font-bold">{nickname}</span>!
+      <div className="max-w-4xl mx-auto px-4 py-10 relative z-10 space-y-8">
+        {/* Championship Podium */}
+        {finalPodium && finalPodium.length > 0 && (
+          <Podium podium={finalPodium} />
+        )}
+
+        {/* Player's Personal Victory Card */}
+        <GlassCard className="p-8 border-neon-cyan/40 shadow-glow-cyan text-center">
+          <div className="inline-flex p-3 rounded-2xl bg-neon-cyan/10 border border-neon-cyan/30 text-neon-cyan mb-3">
+            <Trophy className="w-10 h-10 animate-bounce" />
+          </div>
+          <span className="text-xs font-mono text-neon-cyan uppercase tracking-widest block font-bold">
+            COMPETITION COMPLETED
+          </span>
+          <h2 className="text-3xl sm:text-4xl font-black font-heading text-white mt-1">
+            BATTLE FINISHED!
+          </h2>
+          <p className="text-slate-300 text-sm mt-1">
+            Awesome performance, <span className="text-neon-cyan font-bold">{nickname}</span>!
           </p>
 
-          {myStanding && (
-            <div className="p-4 rounded-xl bg-surface border border-white/10 grid grid-cols-2 gap-4 font-mono">
-              <div>
-                <span className="text-xs text-slate-400 block">FINAL RANK</span>
-                <span className="text-2xl font-black text-neon-amber">
-                  #{myStanding.final_rank || myStanding.rank}
-                </span>
-              </div>
-              <div>
-                <span className="text-xs text-slate-400 block">SCORE</span>
-                <span className="text-2xl font-black text-neon-cyan">
-                  {myStanding.final_score ?? myStanding.score} PTS
-                </span>
-              </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-6 font-mono">
+            <div className="p-4 rounded-xl bg-surface border border-white/10">
+              <span className="text-xs text-slate-400 block font-sans">FINAL RANK</span>
+              <span className="text-2xl sm:text-3xl font-black text-neon-amber mt-1 block">
+                #{myRank}
+              </span>
             </div>
-          )}
+            <div className="p-4 rounded-xl bg-surface border border-white/10">
+              <span className="text-xs text-slate-400 block font-sans">FINAL SCORE</span>
+              <span className="text-2xl sm:text-3xl font-black text-neon-cyan mt-1 block">
+                {myScore} PTS
+              </span>
+            </div>
+            <div className="p-4 rounded-xl bg-surface border border-white/10">
+              <span className="text-xs text-slate-400 block font-sans">XP EARNED</span>
+              <span className="text-2xl sm:text-3xl font-black text-neon-purple mt-1 block">
+                +{myXp} XP
+              </span>
+            </div>
+            <div className="p-4 rounded-xl bg-surface border border-white/10">
+              <span className="text-xs text-slate-400 block font-sans">PLAYERS</span>
+              <span className="text-2xl sm:text-3xl font-black text-slate-200 mt-1 block">
+                {standingsList.length}
+              </span>
+            </div>
+          </div>
 
-          <NeonButton
-            variant="cyan"
-            size="lg"
-            className="w-full"
-            onClick={() => {
-              resetGame();
-              navigate('/dashboard');
-            }}
-          >
-            Back to Dashboard
-          </NeonButton>
+          <div className="flex flex-wrap items-center justify-center gap-3 mt-8 pt-6 border-t border-white/10">
+            <NeonButton
+              variant="primary"
+              size="md"
+              icon={Download}
+              onClick={downloadPlayerReport}
+              className="shadow-glow-cyan"
+            >
+              Download Report (.CSV)
+            </NeonButton>
+            <NeonButton
+              variant="outline"
+              size="md"
+              icon={RotateCcw}
+              onClick={() => {
+                resetGame();
+                navigate('/play');
+              }}
+            >
+              Play Another Match
+            </NeonButton>
+            <NeonButton
+              variant="outline"
+              size="md"
+              onClick={() => {
+                resetGame();
+                navigate('/dashboard');
+              }}
+            >
+              Back to Dashboard
+            </NeonButton>
+          </div>
+        </GlassCard>
+
+        {/* Complete Match Standings Table */}
+        <GlassCard className="p-6 border-white/10">
+          <div className="flex items-center justify-between mb-4 px-2">
+            <div>
+              <h3 className="text-lg font-bold font-heading text-white flex items-center gap-2">
+                <Users className="w-5 h-5 text-neon-blue" />
+                COMPLETE MATCH RESULTS & LEADERBOARD
+              </h3>
+              <p className="text-xs text-slate-400">Official match rankings for all participating gladiators</p>
+            </div>
+            <span className="text-xs font-mono px-3 py-1 rounded-full bg-surface border border-white/10 text-slate-300">
+              {standingsList.length} Competitors
+            </span>
+          </div>
+
+          <div className="space-y-2">
+            {standingsList.map((p, idx) => {
+              const rank = p.final_rank || p.rank || (idx + 1);
+              const pScore = p.final_score ?? p.score ?? 0;
+              const pXp = p.xp_earned ?? (Math.floor(pScore / 10) + 50);
+              const isMe = p.id === participantId || p.nickname === nickname;
+
+              return (
+                <div
+                  key={p.id || idx}
+                  className={`p-3.5 rounded-xl border flex items-center justify-between transition-all ${
+                    isMe
+                      ? 'bg-neon-cyan/15 border-neon-cyan shadow-glow-cyan/20'
+                      : 'glass-panel border-white/5'
+                  }`}
+                >
+                  <div className="flex items-center gap-3.5">
+                    <span className={`w-8 h-8 rounded-lg flex items-center justify-center font-heading font-black text-sm ${
+                      rank === 1 ? 'bg-amber-400/20 text-amber-300 border border-amber-400/40' :
+                      rank === 2 ? 'bg-slate-300/20 text-slate-200 border border-slate-300/40' :
+                      rank === 3 ? 'bg-amber-700/20 text-amber-400 border border-amber-700/40' :
+                      'bg-surface text-slate-400 border border-white/5'
+                    }`}>
+                      #{rank}
+                    </span>
+                    <img
+                      src={`https://api.dicebear.com/7.x/bottts/svg?seed=${p.nickname}`}
+                      alt={p.nickname}
+                      className="w-9 h-9 rounded-lg bg-surface border border-white/10"
+                    />
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-white text-sm">{p.nickname}</span>
+                        {isMe && (
+                          <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-neon-cyan/20 border border-neon-cyan/40 text-neon-cyan font-bold uppercase">
+                            You
+                          </span>
+                        )}
+                      </div>
+                      <span className="text-[11px] font-mono text-neon-purple">+{pXp} XP</span>
+                    </div>
+                  </div>
+
+                  <span className="text-lg font-mono font-black text-neon-cyan">
+                    {pScore} PTS
+                  </span>
+                </div>
+              );
+            })}
+          </div>
         </GlassCard>
       </div>
     );
